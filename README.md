@@ -2,7 +2,56 @@
 
 Мультиплатформенное навигационное приложение для бездорожья, созданное с использованием **Flutter** и **React (Vite)**.
 
----
+
+## 09.11.2025 Рефакторинг приложения. Переход на Clean Architecture (Flutter)
+
+Цель: отделить UI от бизнес‑логики, повысить читаемость, тестируемость и масштабируемость.
+
+### Принципы
+
+Зависимости направлены внутрь: UI → Presentation → Domain ← Data.
+
+Domain ничего не знает о Flutter/Firebase/HTTP.
+
+Data реализует контракты Domain (репозитории), общаясь с внешним миром (Firestore, локальное хранилище).
+
+Presentation оркестрирует UseCase‑ы, подготавливает состояние для UI.
+
+### Слои и допустимые зависимости
+
+``` lib/
+core/ # Общие утилиты и типы (Failure, Result, usecase base, mappers)
+ui/ # Глобальные темы, стили, общие виджеты (не бизнес)
+features/
+auth/
+domain/ # entities, repositories, usecases
+data/ # models, datasources, repo impl
+presentation/ # providers/controllers, pages, widgets
+routes/
+domain/
+data/
+presentation/
+friends/
+chat/
+app/
+app.dart # MaterialApp/Router
+di.dart # Регистрация провайдеров/DI (если нужно)
+main.dart # Вход 
+```
+
+#### Зависимости:
+
+presentation → domain
+
+data → domain
+
+ui → (ничего бизнесового)
+
+core ← все могут зависеть (аккуратно)
+
+Рекомендуемый стейт‑менеджмент: **Riverpod**  (краткий, DI «из коробки», нативно к тестам).
+
+
 
 ## 📁 Структура проекта
 
