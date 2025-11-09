@@ -20,23 +20,23 @@ Presentation оркестрирует UseCase‑ы, подготавливает
 ### Слои и допустимые зависимости
 
 ``` lib/
-core/ # Общие утилиты и типы (Failure, Result, usecase base, mappers)
-ui/ # Глобальные темы, стили, общие виджеты (не бизнес)
-features/
-auth/
-domain/ # entities, repositories, usecases
-data/ # models, datasources, repo impl
-presentation/ # providers/controllers, pages, widgets
-routes/
-domain/
-data/
-presentation/
-friends/
-chat/
-app/
-app.dart # MaterialApp/Router
-di.dart # Регистрация провайдеров/DI (если нужно)
-main.dart # Вход 
+├── core/                   # Общие утилиты и типы (Failure, Result, usecase base, mappers)
+├── ui/                     # Глобальные темы, стили, общие виджеты (не бизнес)
+├── features/
+│   └── auth/
+│       └── domain/         # entities, repositories, usecases
+│       └── data/           # models, datasources, repo impl
+│       └── presentation/   # providers/controllers, pages, widgets
+│   └── routes/
+│       └── domain/
+│       └── data/
+│       └── presentation/
+│   └──friends/
+│   └──chat/
+├──app/
+│   └──app.dart             # MaterialApp/Router
+│   └──di.dart              # Регистрация провайдеров/DI (если нужно)
+├──main.dart                # Вход 
 ```
 
 #### Зависимости:
