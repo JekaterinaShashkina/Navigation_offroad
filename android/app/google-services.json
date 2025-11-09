@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "273719108763",
+    "firebase_url": "https://react-ff62a-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "react-ff62a",
+    "storage_bucket": "react-ff62a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:273719108763:android:c48644c97c6cf6c7d6523e",
+        "android_client_info": {
+          "package_name": "com.example.offroad_nav"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "273719108763-ipi4fhcseol1u95r3gkqlpmc5k3lpjej.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.offroad_nav",
+            "certificate_hash": "0d7e9d4dbbae6cb31d6680f41cb97bcf184c175f"
+          }
+        },
+        {
+          "client_id": "273719108763-ke0ppdq2lso9jsgqnm7c5af7r4t12r6l.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGlOLixeDV0DiLecUqJBmf4PEYVvOmSVg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "273719108763-ke0ppdq2lso9jsgqnm7c5af7r4t12r6l.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "273719108763-1s43no6cq286trqn0bmhqtl5mpdtv92r.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.offroadNav"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
