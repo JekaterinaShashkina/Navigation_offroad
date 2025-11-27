@@ -1,6 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/images.dart';
@@ -11,20 +12,21 @@ import 'package:offroad_nav/design/widgets/auth_card.dart';
 import 'package:offroad_nav/design/widgets/auth_text_field.dart';
 import 'package:offroad_nav/utils/validators.dart';
 
-class EmailLoginPage extends StatefulWidget {
+import 'package:offroad_nav/features/auth/presentation/controllers/auth_controller.dart';
+
+class EmailLoginPage extends ConsumerStatefulWidget {
   const EmailLoginPage({super.key});
 
   @override
-  State<EmailLoginPage> createState() => _EmailLoginPageState();
+  ConsumerState<EmailLoginPage> createState() => _EmailLoginPageState();
 }
 
-class _EmailLoginPageState extends State<EmailLoginPage> {
+class _EmailLoginPageState extends ConsumerState<EmailLoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
 
   bool _obscure = true;
-  bool _loading = false;
 
   @override
   void dispose() {
@@ -35,65 +37,56 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _email.text.trim(),
-        password: _password.text,
-      );
-      if (!mounted) return;
+
+    final email = _email.text.trim();
+    final password = _password.text;
+
+    await ref
+        .read(authControllerProvider.notifier)
+        .signInWithEmail(context, email, password);
+
+    // после попытки логина проверяем, не осталось ли ошибки
+    final state = ref.read(authControllerProvider);
+    if (!mounted) return;
+    if (state.error == null) {
+      // всё ок — идём на главный экран
       Navigator.pushReplacementNamed(context, '/main');
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      final code = e.code;
-      final msg = switch (code) {
-        'invalid-email' => 'Invalid email address.',
-        'user-not-found' => 'No user found for this email.',
-        'wrong-password' => 'Wrong password.',
-        'user-disabled' => 'This account is disabled.',
-        _ => e.message ?? 'Login failed. Try again.',
-      };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _resetPassword() async {
     final email = _email.text.trim();
-    if (email.isEmpty || !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+    if (email.isEmpty ||
+        !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid email to reset password.')),
+        const SnackBar(
+          content: Text('Enter a valid email to reset password.'),
+        ),
       );
       return;
     }
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reset link sent to your email.')),
-      );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Failed to send reset link')),
-      );
-    }
+
+    await ref
+        .read(authControllerProvider.notifier)
+        .sendPasswordReset(context, email);
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+
     return Scaffold(
       backgroundColor: backgroundMainColor,
       appBar: NewAppBar(
         title: "Sign in",
-        onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+        onPressed: () =>
+            Navigator.pushReplacementNamed(context, '/login'),
       ),
       body: SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Spacer(),
+            const Spacer(),
             AuthCard(
               child: Form(
                 key: _formKey,
@@ -126,11 +119,16 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                       prefix: lockImage,
                       suffix: IconButton(
                         icon: _obscure ? hideEyeImage : eyeImage,
-                        onPressed: () => setState(() => _obscure = !_obscure),
+                        onPressed: () =>
+                            setState(() => _obscure = !_obscure),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Enter password';
-                        if (v.length < 6) return 'At least 6 characters';
+                        if (v == null || v.isEmpty) {
+                          return 'Enter password';
+                        }
+                        if (v.length < 6) {
+                          return 'At least 6 characters';
+                        }
                         return null;
                       },
                     ),
@@ -151,8 +149,8 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
             AppButton(
               width: width335,
               text: 'Sign in',
-              loading: _loading,
-              onPressed: _loading ? null : _signIn,
+              loading: authState.loading,
+              onPressed: authState.loading ? null : _signIn,
             ),
             const SizedBox(height: height24),
             RichText(
@@ -164,12 +162,13 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                     text: 'Sign up',
                     style: hintTextStyle,
                     recognizer: TapGestureRecognizer()
-                      ..onTap = () => Navigator.pushNamed(context, '/register'),
+                      ..onTap = () =>
+                          Navigator.pushNamed(context, '/register'),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: height24),
+            const SizedBox(height: height24),
           ],
         ),
       ),

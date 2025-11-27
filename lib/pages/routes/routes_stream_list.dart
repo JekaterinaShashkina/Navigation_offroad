@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:offroad_nav/features/routes/data/repositories/routes_repository.dart';
 import 'package:offroad_nav/pages/routes/route_card.dart';
 import 'package:offroad_nav/pages/routes/route_detail_page.dart';
 
@@ -20,19 +21,15 @@ class RoutesStreamList extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    final Query<Map<String, dynamic>> baseQuery = switch (tab) {
-      RoutesTab.all => FirebaseFirestore.instance
-          .collection('routes')
-          .where('isPrivate', isEqualTo: false)
-          .orderBy('createdAt', descending: true),
-      RoutesTab.mine => FirebaseFirestore.instance
-          .collection('routes')
-          .where('userId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true),
+    final repo = RoutesRepository();
+
+    final stream = switch (tab) {
+      RoutesTab.all => repo.watchPublicRoutes(),
+      RoutesTab.mine => repo.watchMyRoutes(uid),
     };
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: baseQuery.snapshots(),
+      stream: stream,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -40,13 +37,14 @@ class RoutesStreamList extends StatelessWidget {
         if (snap.hasError) {
           return Center(child: Text('Error: ${snap.error}'));
         }
+
         final docs = snap.data?.docs ?? [];
         final q = searchText.trim().toLowerCase();
 
         final filtered = docs.where((d) {
           final m = d.data();
           final name = (m['name'] ?? '').toString().toLowerCase();
-          final sub  = (m['subtitle'] ?? '').toString().toLowerCase();
+          final sub = (m['subtitle'] ?? '').toString().toLowerCase();
           return q.isEmpty || name.contains(q) || sub.contains(q);
         }).toList();
 
@@ -61,13 +59,18 @@ class RoutesStreamList extends StatelessWidget {
           itemBuilder: (_, i) {
             final doc = filtered[i];
             final m = doc.data();
-            final uidCurr = uid;
-            final isOwner = (m['userId'] == uidCurr);
 
-            final len = (m['lengthKm'] is num) ? (m['lengthKm'] as num).toDouble() : null;
-            final lengthText = len == null ? '-' : '${len.toStringAsFixed(2)} km';
+            final isOwner = m['userId'] == uid;
+
+            final len = (m['lengthKm'] is num)
+                ? (m['lengthKm'] as num).toDouble()
+                : null;
+
+            final lengthText =
+                len == null ? '-' : '${len.toStringAsFixed(2)} km';
+
             final ts = m['createdAt'];
-            final dateText = (ts is Timestamp)
+            final dateText = ts is Timestamp
                 ? ts.toDate().toLocal().toString().split('.')[0]
                 : '';
 
@@ -78,9 +81,13 @@ class RoutesStreamList extends StatelessWidget {
               isPrivate: (m['isPrivate'] == true),
               isOwner: isOwner,
               onToggleVisibility: isOwner
-                  ? () => doc.reference.update({'isPrivate': !(m['isPrivate'] == true)})
+                  ? () => repo.toggleVisibility(
+                        doc.id,
+                        m['isPrivate'] == true,
+                      )
                   : null,
-              onDelete: isOwner ? () => _confirmDelete(context, doc.id) : null,
+              onDelete:
+                  isOwner ? () => _confirmDelete(context, repo, doc.id) : null,
               onTap: () => _openDetails(context, m),
             );
           },
@@ -101,7 +108,7 @@ class RoutesStreamList extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, String docId) {
+  void _confirmDelete(BuildContext context, RoutesRepository repo, String docId) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -111,7 +118,7 @@ class RoutesStreamList extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
-              await FirebaseFirestore.instance.collection('routes').doc(docId).delete();
+              await repo.deleteRoute(docId);
               if (context.mounted) Navigator.pop(context);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
