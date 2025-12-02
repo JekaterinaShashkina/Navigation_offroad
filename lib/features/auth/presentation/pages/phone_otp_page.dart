@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -107,14 +106,6 @@ class _PhoneOtpPageState extends State<PhoneOtpPage> {
           }
           rethrow;
         }
-
-        await UserRepository.upsertOnLogin(
-          FirebaseAuth.instance.currentUser!,
-          extra: {'phone': _phoneE164},
-        );
-
-        if (!mounted) return;
-        Navigator.pop(context, true); // сообщаем об успехе вызывающей странице
       }
     } on FirebaseAuthException catch (e) {
       _show(e.message ?? 'Invalid code');

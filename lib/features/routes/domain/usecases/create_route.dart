@@ -5,7 +5,7 @@ import '../repositories/routes_repository.dart';
 
 
 class CreateRoute implements UseCase<String, RouteEntity> {
-final RoutesRepository repo;
+final IRoutesRepository repo;
 CreateRoute(this.repo);
 @override
 Future<Result<String>> call(RouteEntity route) => repo.createRoute(route);

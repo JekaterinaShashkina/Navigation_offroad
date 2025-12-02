@@ -9,7 +9,7 @@ import 'package:offroad_nav/models/group.dart';
 import 'package:offroad_nav/services/groups_repository.dart';
 import 'package:offroad_nav/services/friends_repository.dart';
 import 'package:offroad_nav/pages/groups/add_member_dialog.dart';
-import 'package:offroad_nav/pages/routes/route_detail_page.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page.dart';
 
 class GroupDetailPage extends StatefulWidget {
   final Group group;

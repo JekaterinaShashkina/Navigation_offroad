@@ -2,7 +2,8 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart' as gsi;
-import 'package:offroad_nav/services/user_repository.dart';
+
+import '../../../services/user_repository.dart';
 
 class GoogleAuthService {
   GoogleAuthService._();

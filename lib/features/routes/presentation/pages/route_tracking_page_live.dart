@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
-import 'package:offroad_nav/design/widgets/app_bar.dart';
+
+import '../../../../design/widgets/app_bar.dart';
 
 class RouteTrackingPageLive extends StatefulWidget {
   final List<LatLng> points; // Полилиния маршрута

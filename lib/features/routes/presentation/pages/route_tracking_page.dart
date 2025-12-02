@@ -3,10 +3,9 @@ import 'dart:math' show cos, sqrt, asin, sin, atan2, pi;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:offroad_nav/design/widgets/app_bar.dart';
+
+import '../../../../design/widgets/app_bar.dart';
+import '../../data/repositories/route_tracking_repository.dart';
 
 class RouteTrackingPage extends StatefulWidget {
   final List<LatLng> points;
@@ -25,12 +24,6 @@ class _RouteTrackingPageState extends State<RouteTrackingPage> {
   StreamSubscription<LocationData>? _locationSub;
   Timer? _simulationTimer;
   BitmapDescriptor? _customMarkerIcon;
-
-  final _database = FirebaseDatabase.instanceFor(
-    app: Firebase.app(),
-    databaseURL: 'https://react-ff62a-default-rtdb.europe-west1.firebasedatabase.app',
-  ).ref();
-  final userId = FirebaseAuth.instance.currentUser?.uid;
 
   List<LatLng> traversedPoints = [];
   Duration eta = Duration.zero;
@@ -164,13 +157,10 @@ class _RouteTrackingPageState extends State<RouteTrackingPage> {
   }
 
   void _sendToFirebase(LatLng pos) {
-    if (userId != null) {
-      _database.child("users/$userId/location").set({
-        'lat': pos.latitude,
-        'lng': pos.longitude,
-        'timestamp': ServerValue.timestamp,
-      });
-    }
+    RouteTrackingRepository.instance.sendLocation(
+      lat: pos.latitude,
+      lng: pos.longitude,
+    );
   }
 
   void _updateRouteProgress(LatLng current) {

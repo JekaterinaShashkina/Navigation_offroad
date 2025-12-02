@@ -8,12 +8,12 @@
   import 'features/auth/presentation/pages/auth_page.dart';
   import 'features/auth/presentation/pages/login_page.dart';
   import 'features/auth/presentation/pages/phone_otp_page.dart';
-  
-  import 'pages/auth/sign_up_success_page.dart';
-  import 'pages/routes/make_route_page.dart';
+
+  import 'features/auth/presentation/pages/sign_up_success_page.dart';
+  import 'features/routes/presentation/pages/make_route_page.dart';
   import 'pages/splash_page.dart';
   import 'pages/welcome_login_page.dart';
-  import 'pages/auth/register_page.dart';
+  import 'features/auth/presentation/pages/register_page.dart';
 
   import 'pages/welcome_page.dart';
   import 'MyHomeScreen/main_screen.dart';

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:offroad_nav/design/colors.dart';
-import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/images.dart';
+import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
+
+import '../../../../design/colors.dart';
+import '../../../../design/dimension.dart';
+import '../../../../design/images.dart';
 
 class RouteCard extends StatelessWidget {
   const RouteCard({
     super.key,
-    required this.title,
-    required this.lengthText,
-    required this.dateText,
-    required this.isPrivate,
+    required this.route,
     required this.isOwner,
     this.onToggleVisibility,
     this.onDelete,
@@ -17,10 +16,7 @@ class RouteCard extends StatelessWidget {
     this.widthFactor = 0.94,
   });
 
-  final String title;
-  final String lengthText;
-  final String dateText;
-  final bool isPrivate;
+  final RouteEntity route;
   final bool isOwner;
   final VoidCallback? onToggleVisibility;
   final VoidCallback? onDelete;
@@ -29,13 +25,23 @@ class RouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPrivate = !route.isPublic;
+
     final chipColor = isPrivate ? Colors.red.shade100 : Colors.green.shade100;
     final chipText  = isPrivate ? Colors.red : Colors.green;
+
+    // длина
+    final lengthText = route.lengthKm == null
+        ? '-'
+        : '${route.lengthKm!.toStringAsFixed(2)} km';
+
+    // дата
+    final dateText = route.createdAt.toLocal().toString().split('.')[0];
 
     return Align(
       alignment: Alignment.center,
       child: FractionallySizedBox(
-        widthFactor: widthFactor, // ← делает поуже
+        widthFactor: widthFactor,
         child: Material(
           color: surfaceColor,
           borderRadius: BorderRadius.circular(radius12),
@@ -47,22 +53,20 @@ class RouteCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Меньше иконка
                   SizedBox(width: 28, height: 28, child: routesImage),
                   const SizedBox(width: 10),
 
-                  // Контент
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Заголовок + чип/удаление справа
+                        // Заголовок + чип + delete
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
                               child: Text(
-                                title,
+                                route.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -72,13 +76,14 @@ class RouteCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // Public/Private (только для владельца кликабельно)
                             InkWell(
                               onTap: isOwner ? onToggleVisibility : null,
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: padding8, vertical: padding6),
+                                  horizontal: padding8,
+                                  vertical: padding6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: chipColor,
                                   borderRadius: BorderRadius.circular(8),
@@ -103,9 +108,9 @@ class RouteCard extends StatelessWidget {
                             ],
                           ],
                         ),
+
                         const SizedBox(height: padding6),
 
-                        // Инфо ПОД названием
                         Text(
                           'Length: $lengthText   Date: $dateText',
                           maxLines: 1,

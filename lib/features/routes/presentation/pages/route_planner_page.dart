@@ -5,10 +5,15 @@ import 'package:location/location.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
+import 'package:offroad_nav/features/routes/domain/repositories/routes_repository.dart';
+import 'package:offroad_nav/features/routes/data/repositories/routes_repository_impl.dart';
+import 'package:offroad_nav/features/routes/data/datasources/routes_remote_ds.dart';
+
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/widgets/route_action_bar.dart';
-import 'package:offroad_nav/utils/marker_dot.dart'; // helper для круглых точек
+import 'package:offroad_nav/utils/marker_dot.dart';
 
 class RoutePlannerPage extends StatefulWidget {
   const RoutePlannerPage({super.key});
@@ -17,18 +22,101 @@ class RoutePlannerPage extends StatefulWidget {
   State<RoutePlannerPage> createState() => _RoutePlannerPageState();
 }
 
+/// Контроллер: хранит точки и всю геометрию/логику редактирования.
+class _RoutePlannerController {
+  final List<LatLng> _points = [];
+  bool _closed = false;
+
+  List<LatLng> get points => List.unmodifiable(_points);
+  bool get closed => _closed;
+
+  // список точек для рисования polyline (если замкнуто — первая в конец)
+  List<LatLng> get polylinePoints {
+    final list = List<LatLng>.from(_points);
+    if (_closed && _points.length >= 3) list.add(_points.first);
+    return list;
+  }
+
+  // Haversine расстояние в км
+  double _distKm(LatLng a, LatLng b) {
+    const p = 0.017453292519943295; // pi/180
+    final c = cos;
+    final a1 = 0.5 -
+        c((b.latitude - a.latitude) * p) / 2 +
+        c(a.latitude * p) * c(b.latitude * p) *
+            (1 - c((b.longitude - a.longitude) * p)) / 2;
+    return 12742 * asin(sqrt(a1)); // км
+  }
+
+  double _distanceMeters(LatLng a, LatLng b) => _distKm(a, b) * 1000.0;
+
+  double get totalKm {
+    if (_points.length < 2) return 0;
+    double s = 0;
+    for (int i = 0; i + 1 < _points.length; i++) {
+      s += _distKm(_points[i], _points[i + 1]);
+    }
+    if (_closed && _points.length >= 3) {
+      s += _distKm(_points.last, _points.first);
+    }
+    // округляем до 3 знаков
+    return double.parse(s.toStringAsFixed(3));
+  }
+
+  /// Добавление точки.
+  /// Если нажали рядом с первой точкой при >= 3 точках — просто замыкаем,
+  /// а не добавляем новую.
+  bool addPoint(LatLng p) {
+    if (_points.isNotEmpty && _points.length >= 3) {
+      final d = _distanceMeters(p, _points.first);
+      if (d <= 15) {
+        _closed = true;
+        return false; // точку не добавляли
+      }
+    }
+    _points.add(p);
+    if (_points.length < 3) _closed = false;
+    return true;
+  }
+
+  /// Клик по маркеру:
+  /// - по первой точке переключаем замыкание
+  /// - по другим точкам — удаляем их
+  void onMarkerTap(int index) {
+    if (index == 0 && _points.length >= 3) {
+      _closed = !_closed;
+    } else {
+      removePoint(index);
+    }
+  }
+
+  void removePoint(int index) {
+    if (index < 0 || index >= _points.length) return;
+    _points.removeAt(index);
+    if (_points.length < 3) _closed = false;
+  }
+
+  void updatePoint(int index, LatLng p) {
+    if (index < 0 || index >= _points.length) return;
+    _points[index] = p;
+  }
+
+  void clear() {
+    _points.clear();
+    _closed = false;
+  }
+}
+
 class _RoutePlannerPageState extends State<RoutePlannerPage> {
   GoogleMapController? _map;
   final _loc = Location();
 
-  // Точки маршрута
-  final List<LatLng> _points = [];
-  bool _closed = false; // замкнут ли контур
+  final _controllerLogic = _RoutePlannerController();
 
   // Стартовая позиция камеры
   LatLng _camera = const LatLng(59.0, 26.0);
 
-  // Иконка «точки»
+  // Иконка точек
   BitmapDescriptor? _dotIcon;
 
   @override
@@ -39,7 +127,6 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
   }
 
   Future<void> _initDot() async {
-    // можно настроить размер/цвет
     _dotIcon = await MarkerDot.get(size: 16);
     if (mounted) setState(() {});
   }
@@ -60,90 +147,17 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
     } catch (_) {}
   }
 
-  // ========== ГЕОМЕТРИЯ ==========
-
-  // список точек для рисования линии (если замкнуто — добавляем первую в конец)
-  List<LatLng> get _polylinePoints {
-    final list = List<LatLng>.from(_points);
-    if (_closed && _points.length >= 3) list.add(_points.first);
-    return list;
-  }
-
-  // Дистанция (км) между двумя точками (Haversine)
-  double _distKm(LatLng a, LatLng b) {
-    const p = 0.017453292519943295; // pi/180
-    final c = cos;
-    final a1 = 0.5 -
-        c((b.latitude - a.latitude) * p) / 2 +
-        c(a.latitude * p) * c(b.latitude * p) * (1 - c((b.longitude - a.longitude) * p)) / 2;
-    return 12742 * asin(sqrt(a1)); // км
-  }
-
-  // Общая длина маршрута (км)
-  double get _totalKm {
-    if (_points.length < 2) return 0;
-    double s = 0;
-    for (int i = 0; i + 1 < _points.length; i++) {
-      s += _distKm(_points[i], _points[i + 1]);
-    }
-    if (_closed && _points.length >= 3) {
-      s += _distKm(_points.last, _points.first);
-    }
-    return double.parse(s.toStringAsFixed(3));
-  }
-
-  // Небольшая утилита расстояния в метрах
-  double _distanceMeters(LatLng a, LatLng b) => _distKm(a, b) * 1000.0;
-
-  // ========== РЕДАКТИРОВАНИЕ ТОЧЕК ==========
-
-  // Добавить точку (по long-press)
-  void _addPoint(LatLng p) {
-    // если тыкнули рядом со стартом — просто замкнём
-    if (_points.isNotEmpty && _points.length >= 3) {
-      final d = _distanceMeters(p, _points.first);
-      if (d <= 15) {
-        setState(() => _closed = true);
-        return;
-      }
-    }
-    setState(() {
-      _points.add(p);
-      if (_points.length < 3) _closed = false; // до 3 точек не замыкаем
-    });
-    _fitBounds();
-  }
-
-  // Клик по маркеру: для первой — переключить замыкание, для остальных — удалить
-  void _onMarkerTap(int i) {
-    if (i == 0 && _points.length >= 3) {
-      setState(() => _closed = !_closed);
-    } else {
-      _removePoint(i);
-    }
-  }
-
-  void _removePoint(int i) {
-    if (i < 0 || i >= _points.length) return;
-    setState(() {
-      _points.removeAt(i);
-      if (_points.length < 3) _closed = false;
-    });
-  }
-
-  void _updatePoint(int i, LatLng p) {
-    setState(() => _points[i] = p);
-  }
-
-  // Подогнать камеру
+  // Подогнать камеру под все точки
   void _fitBounds() {
-    if (_points.length < 2 || _map == null) return;
-    double minLat = _points.first.latitude,
-        maxLat = _points.first.latitude,
-        minLng = _points.first.longitude,
-        maxLng = _points.first.longitude;
+    final points = _controllerLogic.points;
+    if (points.length < 2 || _map == null) return;
 
-    for (final p in _points) {
+    double minLat = points.first.latitude,
+        maxLat = points.first.latitude,
+        minLng = points.first.longitude,
+        maxLng = points.first.longitude;
+
+    for (final p in points) {
       minLat = p.latitude < minLat ? p.latitude : minLat;
       maxLat = p.latitude > maxLat ? p.latitude : maxLat;
       minLng = p.longitude < minLng ? p.longitude : minLng;
@@ -157,17 +171,19 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
     _map!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
   }
 
-  void _clear() {
-    setState(() {
-      _points.clear();
-      _closed = false;
-    });
+  void _onAddPoint(LatLng p) {
+    final added = _controllerLogic.addPoint(p);
+    setState(() {});
+    if (added) _fitBounds();
   }
 
-  // ========== СОХРАНЕНИЕ ==========
+  void _onClear() {
+    setState(() => _controllerLogic.clear());
+  }
 
   Future<void> _save() async {
-    if (_points.length < 2) {
+    final points = _controllerLogic.points;
+    if (points.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add at least two points')),
       );
@@ -199,53 +215,56 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    // Берём _polylinePoints — если _closed, первая точка уже добавлена в конец
-    final pts = _polylinePoints
+    final pts = _controllerLogic.polylinePoints
         .map((p) => {'lat': p.latitude, 'lng': p.longitude})
         .toList();
 
     await FirebaseFirestore.instance.collection('routes').add({
       'userId': uid,
       'name': name,
-      'points': pts,           // замыкающий сегмент сохранён
-      'lengthKm': _totalKm,
+      'points': pts,
+      'lengthKm': _controllerLogic.totalKm,
       'createdAt': DateTime.now(),
       'isPrivate': true,
-      'closed': _closed,       // флаг тоже полезно хранить
+      'closed': _controllerLogic.closed,
     });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Route is saved')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Route is saved')),
+    );
     Navigator.pop(context);
   }
 
-  // ========== UI ==========
-
   @override
   Widget build(BuildContext context) {
+    final points = _controllerLogic.points;
+    final polylinePoints = _controllerLogic.polylinePoints;
+    final totalKm = _controllerLogic.totalKm;
+
     final markers = <Marker>{
-      for (int i = 0; i < _points.length; i++)
+      for (int i = 0; i < points.length; i++)
         Marker(
           markerId: MarkerId('p$i'),
-          position: _points[i],
+          position: points[i],
           draggable: true,
-          onDragEnd: (p) => _updatePoint(i, p),
-          onTap: () => _onMarkerTap(i),
+          onDragEnd: (p) => setState(() => _controllerLogic.updatePoint(i, p)),
+          onTap: () => setState(() => _controllerLogic.onMarkerTap(i)),
           icon: i == 0
-              ? BitmapDescriptor.defaultMarker // первая — маркер
-              : (_dotIcon ?? BitmapDescriptor.defaultMarker), // остальные — «точки»
+              ? BitmapDescriptor.defaultMarker
+              : (_dotIcon ?? BitmapDescriptor.defaultMarker),
           anchor: i == 0 ? const Offset(0.5, 1.0) : const Offset(0.5, 0.5),
           zIndex: i == 0 ? 20 : 10,
         ),
     };
 
     final polylines = <Polyline>{
-      if (_points.isNotEmpty)
+      if (points.isNotEmpty)
         Polyline(
           polylineId: const PolylineId('planned'),
           color: Colors.blue,
           width: 6,
-          points: _polylinePoints, // учитываем замыкание
+          points: polylinePoints,
         ),
     };
 
@@ -262,12 +281,12 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
             onMapCreated: (c) => _map = c,
             markers: markers,
             polylines: polylines,
-            onLongPress: _addPoint,       // добавление точки
+            onLongPress: _onAddPoint,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
           ),
 
-          // Cчётчик точек + длина
+          // счётчик точек + длина
           Positioned(
             top: 12,
             left: 12,
@@ -280,14 +299,17 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Pts: ${_points.length}  •  ${_totalKm.toStringAsFixed(3)} km',
-                  style: const TextStyle(color: surfaceColor, fontWeight: FontWeight.w600),
+                  'Pts: ${points.length}  •  ${totalKm.toStringAsFixed(3)} km',
+                  style: const TextStyle(
+                    color: surfaceColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
           ),
 
-          // Кнопка «центрировать на мне»
+          // кнопка "центрировать на мне"
           Positioned(
             right: 16,
             top: 12,
@@ -301,7 +323,7 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
             ),
           ),
 
-          // Нижняя панель действий (Save / Delete)
+          // нижняя панель
           Positioned(
             left: 16,
             right: 16,
@@ -310,10 +332,10 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
               top: false,
               child: RouteActionBar(
                 onSave: _save,
-                onToggleGo: null,   // в планировщике не нужна
-                onDelete: _points.isEmpty ? null : _clear,
-                canSave: _points.length >= 2,
-                canDelete: _points.isNotEmpty,
+                onToggleGo: null,
+                onDelete: points.isEmpty ? null : _onClear,
+                canSave: points.length >= 2,
+                canDelete: points.isNotEmpty,
               ),
             ),
           ),

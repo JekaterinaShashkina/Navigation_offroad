@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:offroad_nav/design/widgets/app_button.dart';
-import 'package:offroad_nav/design/colors.dart';
-import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/pages/routes/route_creation_page.dart';
-import 'package:offroad_nav/pages/routes/route_planner_page.dart';
+
+import '../../../../design/widgets/app_button.dart';
+import '../../../../design/colors.dart';
+import '../../../../design/widgets/app_bar.dart';
+import 'route_creation_page.dart';
+import 'route_planner_page.dart';
 
 class MakeRoutePage extends StatelessWidget {
   const MakeRoutePage({super.key});

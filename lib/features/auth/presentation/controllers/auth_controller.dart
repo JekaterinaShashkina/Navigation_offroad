@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:offroad_nav/services/phone_auth_service.dart';
 
+import '../../../../services/phone_auth_service.dart';
 import '../../data/auth_repository.dart';
 
 class AuthState {
@@ -149,6 +149,44 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+// 🟣 Регистрация по email/паролю
+  Future<void> registerWithEmail(
+    BuildContext context, {
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    state = state.copyWith(loading: true, error: null);
+
+    try {
+      await ref.read(authRepositoryProvider).registerWithEmail(
+            name: name,
+            email: email,
+            password: password,
+          );
+
+      state = state.copyWith(loading: false);
+      // навигацию будем делать в самой странице, если ошибки нет
+    } on FirebaseAuthException catch (e) {
+      final msg = switch (e.code) {
+        'email-already-in-use' => 'This email is already in use.',
+        'invalid-email' => 'Invalid email address.',
+        'weak-password' => 'Password is too weak.',
+        _ => e.message ?? 'Registration failed. Try again.',
+      };
+
+      state = state.copyWith(loading: false, error: msg);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    } catch (e) {
+      state = state.copyWith(loading: false, error: e.toString());
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registration error: $e')),
+      );
+    }
+  }
   /// 🚪 Выход (опционально, если где-то нужен)
   Future<void> signOut() async {
     await ref.read(authRepositoryProvider).signOut();

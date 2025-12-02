@@ -1,12 +1,14 @@
-import 'package:offroad_nav/core/failure.dart';
-import 'package:offroad_nav/core/result.dart';
+// можно будет удалить попозже
+
+import '../../../../core/failure.dart';
+import '../../../../core/result.dart';
 import '../../domain/entities/route_entity.dart';
 import '../../domain/repositories/routes_repository.dart';
 import '../models/route_model.dart';
 import '../datasources/routes_remote_ds.dart';
 
 
-class RoutesRepositoryImpl implements RoutesRepository {
+class RoutesRepositoryImpl implements IRoutesRepository {
 final RoutesRemoteDataSource remote;
 RoutesRepositoryImpl(this.remote);
 

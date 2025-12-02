@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/pages/routes/route_tracking_page_live.dart';
-import 'package:offroad_nav/pages/routes/route_tracking_page.dart';
+
+import '../../../../design/widgets/app_bar.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/route_tracking_page_live.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/route_tracking_page.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final String name;
+
+  // Ожидаем список map-ов вида {'lat': double, 'lng': double}
   final List<dynamic> points;
 
   const RouteDetailPage({super.key, required this.name, required this.points});
@@ -18,13 +21,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   GoogleMapController? _mapController;
 
   List<LatLng> get routePoints => widget.points
-      .map<LatLng>((p) => LatLng(p['lat'], p['lng']))
+      .map<LatLng>((p) {
+        final m = p as Map;
+        final lat = (m['lat'] as num).toDouble();
+        final lng = (m['lng'] as num).toDouble();
+        return LatLng(lat, lng);
+      })
       .toList();
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   void _fitMapToPolyline() {
     if (_mapController == null || routePoints.isEmpty) return;

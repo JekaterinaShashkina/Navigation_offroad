@@ -5,10 +5,9 @@ import 'package:offroad_nav/MyHomeScreen/main_screen.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
 import 'package:offroad_nav/pages/competitions/competitions_page.dart';
 import 'package:offroad_nav/pages/groups/groups_page.dart';
-import 'package:offroad_nav/pages/routes/routes_list_page.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/routes_list_page.dart';
 import 'package:offroad_nav/pages/friends/friends_page.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/pages/competitions/competitions_page.dart';
 
 class MainMenuPage extends StatelessWidget {
   const MainMenuPage({super.key});

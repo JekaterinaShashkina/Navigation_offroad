@@ -1,8 +1,8 @@
-import 'package:offroad_nav/core/result.dart';
+import '../../../../core/result.dart';
 import '../entities/route_entity.dart';
 
 
-abstract interface class RoutesRepository {
+abstract interface class IRoutesRepository {
 Future<Result<List<RouteEntity>>> getVisibleRoutes(String userId);
 Future<Result<List<RouteEntity>>> getMyRoutes(String userId);
 Future<Result<String>> createRoute(RouteEntity route);
