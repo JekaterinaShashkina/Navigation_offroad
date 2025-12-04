@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:offroad_nav/pages/routes/route_detail_page.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page.dart';
 import 'package:offroad_nav/design/images.dart';
 
 class RouteSearchWidget extends StatefulWidget {

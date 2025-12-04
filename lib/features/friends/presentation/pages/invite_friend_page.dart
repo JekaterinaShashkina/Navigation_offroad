@@ -1,4 +1,3 @@
-// lib/pages/friends/invite_friend_page.dart
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/styles.dart';

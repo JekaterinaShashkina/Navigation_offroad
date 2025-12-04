@@ -112,6 +112,33 @@ class FriendsRepository {
     });
   }
 
+  Stream<int> incomingPendingCount(String uid) {
+    return _firestore
+        .collection('friend_requests')
+        .where('to_user_id', isEqualTo: uid)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((s) => s.size);
+  }
+
+  Future<void> removeFriend(String currentUid, String friendId) async {
+    final ref = _firestore.collection('friends');
+
+    final mySide = await ref
+        .where('user_id', isEqualTo: currentUid)
+        .where('friend_id', isEqualTo: friendId)
+        .get();
+
+    final theirSide = await ref
+        .where('user_id', isEqualTo: friendId)
+        .where('friend_id', isEqualTo: currentUid)
+        .get();
+
+    for (final d in [...mySide.docs, ...theirSide.docs]) {
+      await d.reference.delete();
+    }
+  }
+
   /// Проверить, есть ли у пользователя друзья
   Future<bool> hasFriends(String userId) async {
     final friends = await getFriends(userId);

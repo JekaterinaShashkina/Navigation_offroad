@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/images.dart';
-import 'package:offroad_nav/MyHomeScreen/main_screen.dart';
+import 'package:offroad_nav/features/home/presentation/pages/main_screen.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
 import 'package:offroad_nav/pages/competitions/competitions_page.dart';
 import 'package:offroad_nav/pages/groups/groups_page.dart';
 import 'package:offroad_nav/features/routes/presentation/pages/routes_list_page.dart';
-import 'package:offroad_nav/pages/friends/friends_page.dart';
+import 'package:offroad_nav/features/friends/presentation/pages/friends_page.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 
 class MainMenuPage extends StatelessWidget {

@@ -155,7 +155,7 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
                       },
                       onToggleVisibility: isOwner
                           ? () async {
-                              await repo.toggleVisibility(
+                              await repo.setPrivacy(
                                 route.id,
                                 !route.isPublic,
                               );

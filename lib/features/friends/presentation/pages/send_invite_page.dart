@@ -1,4 +1,3 @@
-// lib/pages/friends/send_invite_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/friend_item.dart';
+import 'package:offroad_nav/features/friends/data/repositories/friend_requests_repository.dart';
+import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
 
 class SendInvitePage extends StatefulWidget {
   const SendInvitePage({super.key});
@@ -21,6 +22,10 @@ class _SendInvitePageState extends State<SendInvitePage> {
   bool _loading = false;
   String? _error;
 
+  // репозитории
+  final FriendsRepository _friendsRepo = FriendsRepository();
+  final FriendRequestsRepository _requestsRepo = FriendRequestsRepository();
+  
   // связи для статусов кнопок
   final Set<String> _sentIds = {};
   final Set<String> _recvIds = {};
@@ -56,25 +61,17 @@ class _SendInvitePageState extends State<SendInvitePage> {
     _recvIds.clear();
     _friendIds.clear();
 
-    final sent = await FirebaseFirestore.instance
-        .collection('friend_requests')
-        .where('from_user_id', isEqualTo: uid)
-        .where('status', isEqualTo: 'pending')
-        .get();
-    _sentIds.addAll(sent.docs.map((d) => d['to_user_id'] as String));
+    // исходящие заявки
+    final outgoing = await _requestsRepo.getOutgoingRequests(uid);
+    _sentIds.addAll(outgoing.map((r) => r.toUserId));
 
-    final recv = await FirebaseFirestore.instance
-        .collection('friend_requests')
-        .where('to_user_id', isEqualTo: uid)
-        .where('status', isEqualTo: 'pending')
-        .get();
-    _recvIds.addAll(recv.docs.map((d) => d['from_user_id'] as String));
+    // входящие заявки
+    final incoming = await _requestsRepo.getIncomingRequests(uid);
+    _recvIds.addAll(incoming.map((r) => r.fromUserId));
 
-    final friends = await FirebaseFirestore.instance
-        .collection('friends')
-        .where('user_id', isEqualTo: uid)
-        .get();
-    _friendIds.addAll(friends.docs.map((d) => d['friend_id'] as String));
+    // друзья
+    final friends = await _friendsRepo.getFriends(uid);
+    _friendIds.addAll(friends.map((f) => f.uid));
   }
 
   // ---------- поиск name/email без учёта регистра (префикс + клиентский contains) ----------
@@ -206,13 +203,10 @@ class _SendInvitePageState extends State<SendInvitePage> {
       return;
     }
 
-    await FirebaseFirestore.instance.collection('friend_requests').add({
-      'from_user_id': current.uid,
-      'to_user_id': targetId,
-      'status': 'pending',
-      'created_at': FieldValue.serverTimestamp(),
-      'updated_at': FieldValue.serverTimestamp(),
-    });
+    await _requestsRepo.sendRequest(
+      fromUid: current.uid,
+      toUid: targetId,
+    );
 
     if (!mounted) return;
     setState(() {

@@ -7,7 +7,7 @@ import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/smart_avatar.dart';
 import 'package:offroad_nav/pages/profile/edit_profile_page.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/MyHomeScreen/main_screen.dart';
+import 'package:offroad_nav/features/home/presentation/pages/main_screen.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:offroad_nav/pages/profile/membership_page.dart';

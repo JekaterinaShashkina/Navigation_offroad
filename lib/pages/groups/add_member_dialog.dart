@@ -3,7 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/models/group.dart';
-import 'package:offroad_nav/services/friends_repository.dart';
+import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
 
 class AddMemberDialog extends StatefulWidget {
   final Group group;

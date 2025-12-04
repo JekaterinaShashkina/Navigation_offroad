@@ -7,7 +7,7 @@ import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/models/group.dart';
 import 'package:offroad_nav/services/groups_repository.dart';
-import 'package:offroad_nav/services/friends_repository.dart';
+import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
 import 'package:offroad_nav/pages/groups/add_member_dialog.dart';
 import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page.dart';
 

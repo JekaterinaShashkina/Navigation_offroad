@@ -24,6 +24,8 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
+  // TODO: вынести работу с Firestore в ChatsRepository / MessagesRepository,
+  // сделать нормальные модели и использовать их здесь вместо "сырых" Map.
   final _text = TextEditingController();
   final _scroll = ScrollController();
 
