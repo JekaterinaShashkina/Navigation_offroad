@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:offroad_nav/pages/profile/profile_page.dart';
+import 'package:offroad_nav/features/profile/presentation/pages/profile_page.dart';
 import 'package:offroad_nav/design/widgets/smart_avatar.dart';
 
 class ProfileAvatarButton extends StatelessWidget {

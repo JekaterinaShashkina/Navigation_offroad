@@ -7,6 +7,8 @@ const double fontSize14 = 14;
 const double fontSize12 =12;
 
 const double width2 = 2;
+const double width4 = 4;
+const double width8 =8;
 const double width16 = 16;
 const double width200 = 200;
 const double width238 = 238;

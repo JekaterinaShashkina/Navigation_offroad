@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:offroad_nav/features/auth/presentation/pages/login_page.dart';
 import 'package:offroad_nav/features/auth/presentation/pages/welcome_page.dart';
 import 'package:offroad_nav/features/home/presentation/pages/main_screen.dart';
 

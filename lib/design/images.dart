@@ -395,3 +395,28 @@ final SvgPicture goIconNavigation = SvgPicture.asset(
   height: 21,
   fit: BoxFit.contain,
 );
+
+final SvgPicture motoIcon = SvgPicture.asset(
+  'assets/images/moto_icon.svg',
+  width: 56,
+  // height: 21,
+  fit: BoxFit.contain,
+);
+
+final SvgPicture jeepIcon = SvgPicture.asset(
+  'assets/images/Jeep_icon.svg',
+  width: 64,
+  // height: 21,
+  fit: BoxFit.contain,
+);
+
+final SvgPicture truckIcon = SvgPicture.asset(
+  'assets/images/small_truck_icon.svg',
+  width: 64,
+  // height: 21,
+  fit: BoxFit.contain,
+);
+
+const motoIconPath  = 'assets/images/moto_icon.svg';
+const jeepIconPath  = 'assets/images/Jeep_icon.svg';
+const truckIconPath = 'assets/images/small_truck_icon.svg';

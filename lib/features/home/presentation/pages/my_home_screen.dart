@@ -7,8 +7,6 @@ import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/profile_avatar_button.dart';
 import 'package:offroad_nav/design/widgets/route_search_widget.dart';
-import 'package:offroad_nav/pages/profile/profile_page.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class MyHomeScreen extends StatefulWidget {
   const MyHomeScreen({super.key});

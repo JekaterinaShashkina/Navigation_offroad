@@ -4,7 +4,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // нужен только если будешь где-то использовать напрямую, но можно и убрать
 
 import 'package:offroad_nav/design/avatars.dart';
 import 'package:offroad_nav/design/colors.dart';
