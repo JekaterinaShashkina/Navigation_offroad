@@ -4,12 +4,20 @@ import 'package:offroad_nav/features/groups/domain/entities/group.dart';
 
 
 class GroupCreateParams {
-  final String ownerId;    // лидер группы
+  final String ownerId;
   final String name;
+  final String? description;
   final String? avatarUrl;
+  final String? competitionId;
   final String? activeRouteId;
+  final int? maxMembers;
+  final bool isOpen;
 
-  const GroupCreateParams({
+  const GroupCreateParams( {
+    this.description, 
+    this.competitionId, 
+    this.maxMembers, 
+    this.isOpen = true,
     required this.ownerId,
     required this.name,
     this.avatarUrl,
@@ -18,23 +26,37 @@ class GroupCreateParams {
 }
 
 class GroupsRepository {
-  GroupsRepository(FirebaseFirestore instance, {FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
+    final FirebaseFirestore _db;
+    final CollectionReference<Map<String, dynamic>> _col;
 
-  final FirebaseFirestore _db;
-  
-
-  CollectionReference<Map<String, dynamic>> get _col =>
-      _db.collection('groups');
+  GroupsRepository(FirebaseFirestore db)
+      : _db = db,
+        _col = db.collection('groups');
 
   // ----- чтение -----
 
   /// Все группы, где текущий пользователь лидер
-  Stream<List<Group>> watchMyGroups(String ownerId) {
+  Stream<List<Group>> watchMyGroups(String userId) {
     return _col
-        .where('leader_id', isEqualTo: ownerId)
-        .orderBy('name')
+        .where('owner_id', isEqualTo: userId)
+       .orderBy('created_at', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map(Group.fromDoc).toList());
+        .map((snap) {
+          final list = snap.docs.map(Group.fromDoc).toList();
+
+                // Если в Group есть поле createdAt (DateTime?):
+        list.sort((a, b) {
+          final aTime = a.createdAt;
+          final bTime = b.createdAt;
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return 1;  // null в конец
+          if (bTime == null) return -1;
+          return bTime.compareTo(aTime); // по убыванию (новые сверху)
+        });
+
+        return list;
+      });
+
   }
 
   /// Одна группа
@@ -45,77 +67,99 @@ class GroupsRepository {
     });
   }
 
-  // ----- мутации -----
+  /// Создание группы, возвращает id документа.
+  Future<String> createGroup(GroupCreateParams p) async {
+    final now = FieldValue.serverTimestamp();
 
-  Future<String> createGroup(GroupCreateParams params) async {
-    final now = Timestamp.now();
     final docRef = await _col.add({
-      'name'          : params.name,
-      'avatar_url'    : params.avatarUrl,
-      'leader_id'     : params.ownerId,
-      'active_route_id': params.activeRouteId,
-      'is_add_new'    : false,
-      'created_at'    : now,
-      'updated_at'    : now,
+      'name': p.name,
+      'owner_id': p.ownerId,
+      'description': p.description,
+      'avatar_url': p.avatarUrl,
+      'competition_id': p.competitionId,
+      'route_id': p.activeRouteId,
+      'members_count': 1, // владелец как первый участник
+      'max_members': p.maxMembers,
+      'is_open': p.isOpen,
+      'status': 'active',
+      'created_at': now,
+      'updated_at': now,
     });
 
     // Здесь же можно создать подколлекцию members и добавить лидера
-    await docRef.collection('members').doc(params.ownerId).set({
-      'user_id'  : params.ownerId,
-      'role'     : 'leader',
-      'joined_at': now,
+   await _col
+        .doc(docRef.id)
+        .collection('members')
+        .doc(p.ownerId)
+        .set({
+      'user_id': p.ownerId,
+      'role': 'owner',
+      'created_at': now,
     });
 
     return docRef.id;
   }
 
-  Future<void> updateGroupName(String groupId, String newName) async {
-    await _col.doc(groupId).update({
-      'name'      : newName,
-      'updated_at': Timestamp.now(),
-    });
-  }
 
-  Future<void> updateGroupAvatar(String groupId, String newAvatarUrl) async {
-    await _col.doc(groupId).update({
-      'avatar_url': newAvatarUrl,
-      'updated_at': Timestamp.now(),
-    });
-  }
 
-  Future<void> setActiveRoute(String groupId, String? routeId) async {
-    await _col.doc(groupId).update({
-      'active_route_id': routeId,
-      'updated_at'     : Timestamp.now(),
-    });
-  }
-
-  Future<void> deleteGroup(String groupId) async {
-    await _col.doc(groupId).delete();
-    // при желании можно ещё удалить подколлекцию members через Cloud Function
-  }
-
-  // ----- участники (через подколлекцию) -----
-
+  /// Добавить участника в группу (подколлекция members + счётчик).
 Future<void> addMemberToGroup({
   required String groupId,
   required String userId,
-  String? userName,
-  String? userAvatar,
+  String? name,
+  String? avatarUrl,
 }) async {
-  final membersCol = _col.doc(groupId).collection('members');
+  final groupRef = _col.doc(groupId);
+  final memberRef = groupRef.collection('members').doc(userId);
 
-  await membersCol.doc(userId).set({
-    'user_id'  : userId,
-    'role'     : 'member',
-    'joined_at': Timestamp.now(),
-    if (userName != null) 'name': userName,
-    if (userAvatar != null) 'avatar_url': userAvatar,
+    await _db.runTransaction((tx) async {
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) {
+        tx.set(memberRef, {
+          'user_id': userId,
+          'name': name,
+          'avatar_url': avatarUrl,
+          'created_at': FieldValue.serverTimestamp(),
+        });
+
+        final groupSnap = await tx.get(groupRef);
+        final data = groupSnap.data() ?? {};
+        final currentCount = (data['members_count'] as num?)?.toInt() ?? 0;
+        tx.update(groupRef, {
+          'members_count': currentCount + 1,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      }
   });
 }
+
+/// Удалить участника (и уменьшить счётчик).
   Future<void> removeMemberFromGroup(String groupId, String userId) async {
-    final membersCol = _col.doc(groupId).collection('members');
-    await membersCol.doc(userId).delete();
+    final groupRef = _col.doc(groupId);
+    final memberRef = groupRef.collection('members').doc(userId);
+    
+    await _db.runTransaction((tx) async {
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) return;
+
+      tx.delete(memberRef);
+
+      final groupSnap = await tx.get(groupRef);
+      final data = groupSnap.data() ?? {};
+      final currentCount = (data['members_count'] as num?)?.toInt() ?? 0;
+      tx.update(groupRef, {
+        'members_count': currentCount > 0 ? currentCount - 1 : 0,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+ /// Установить активный маршрут для группы.
+    Future<void> setActiveRoute(String groupId, String? routeId) async {
+    await _col.doc(groupId).update({
+      'route_id': routeId,
+      'updated_at': FieldValue.serverTimestamp()
+    });
   }
 
   Future<Set<String>> getMemberIds(String groupId) async {
@@ -145,4 +189,26 @@ Future<void> addMemberToGroup({
               .toList();
         });
 }
+
+  Future<void> updateGroupName(String groupId, String newName) async {
+    await _col.doc(groupId).update({
+      'name'      : newName,
+      'updated_at': Timestamp.now(),
+    });
+  }
+
+  Future<void> updateGroupAvatar(String groupId, String newAvatarUrl) async {
+    await _col.doc(groupId).update({
+      'avatar_url': newAvatarUrl,
+      'updated_at': Timestamp.now(),
+    });
+  }
+
+
+/// Удалить группу (документ + по-хорошему members — потом).
+  Future<void> deleteGroup(String groupId) async {
+    await _col.doc(groupId).delete();
+        // TODO: по уму — пройтись по подколлекции members и тоже подчистить
+    // (через батчи или Cloud Function).
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
+import 'package:offroad_nav/design/widgets/smart_avatar.dart';
 import 'package:offroad_nav/features/groups/domain/entities/group.dart';
 
 class GroupCard extends StatelessWidget {
@@ -35,14 +36,13 @@ class GroupCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Аватар группы (когда позже добавим поддержку svg или url)
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: const Color(0xFFE0E0E0),
-                child: const Icon(
+              SmartAvatar(
+                src: group.avatarUrl,        // 👈 то же поле, что в деталях
+                size: 56,
+                placeholder: const Icon(
                   Icons.group,
-                  color: textMainColor,
-                  size: 30,
+                  color: textHintColor,
+                  size: 32,
                 ),
               ),
 

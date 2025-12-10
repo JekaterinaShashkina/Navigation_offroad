@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/styles.dart';
-import 'package:offroad_nav/design/images.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/features/competition/application/providers/competitions_providers.dart';
 import 'package:offroad_nav/features/competition/domain/entities/competition.dart';

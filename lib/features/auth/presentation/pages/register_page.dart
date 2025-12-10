@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:offroad_nav/design/avatars.dart';
@@ -12,10 +11,10 @@ import 'package:offroad_nav/design/images.dart';
 import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
-import 'package:offroad_nav/design/widgets/auth_card.dart';
-import 'package:offroad_nav/design/widgets/auth_text_field.dart';
+import 'package:offroad_nav/features/auth/presentation/widgets/auth_card.dart';
+import 'package:offroad_nav/features/auth/presentation/widgets/auth_text_field.dart';
 import 'package:offroad_nav/design/widgets/avatar_circle.dart';
-import 'package:offroad_nav/design/widgets/phone_input_field.dart';
+import 'package:offroad_nav/features/auth/presentation/widgets/phone_input_field.dart';
 import 'package:offroad_nav/design/widgets/verify_toggle_button.dart';
 import 'package:offroad_nav/models/country_code.dart';
 import 'package:offroad_nav/features/auth/presentation/pages/sign_up_success_page.dart';

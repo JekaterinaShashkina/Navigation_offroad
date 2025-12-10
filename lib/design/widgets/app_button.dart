@@ -111,23 +111,3 @@ class AppButton extends StatelessWidget {
     );
   }
 }
-
-/// Отдельный виджет, чтобы не перехватывать тап и иметь паддинг справа
-class _SuffixAligner extends StatelessWidget {
-  const _SuffixAligner();
-
-  @override
-  Widget build(BuildContext context) {
-    final parent = context.findAncestorWidgetOfExactType<AppButton>()!;
-    final suffix = (parent as dynamic).suffix as Widget?;
-    if (suffix == null) return const SizedBox.shrink();
-
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 10),
-        child: IgnorePointer(child: suffix),
-      ),
-    );
-  }
-}

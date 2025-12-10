@@ -3,7 +3,7 @@ import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
-import 'package:offroad_nav/design/widgets/auth_card.dart';
+import 'package:offroad_nav/features/auth/presentation/widgets/auth_card.dart';
 
 class SignUpSuccessPage extends StatelessWidget {
   const SignUpSuccessPage({super.key});
