@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:offroad_nav/controllers/tracking/tracker_controller.dart';
+import 'package:offroad_nav/features/routes/application/controllers/tracker_controller.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/design/widgets/route_action_bar.dart';
-import 'package:offroad_nav/design/widgets/tracker_map.dart';
+import 'package:offroad_nav/features/routes/presentation/widgets/route_action_bar.dart';
+import 'package:offroad_nav/features/routes/presentation/widgets/tracker_map.dart';
 
 // NEW: доменные штуки
 import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';

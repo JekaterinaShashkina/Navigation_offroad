@@ -6,10 +6,10 @@ import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/pages/payment/payment_options_page.dart';
+import 'package:offroad_nav/features/profile/presentation/pages/payment/payment_options_page.dart';
 
 // сервис профиля
-import 'package:offroad_nav/services/user_profile_service.dart';
+import 'package:offroad_nav/features/profile/data/services/user_profile_service.dart';
 
 class MembershipPage extends StatelessWidget {
   const MembershipPage({super.key});

@@ -4,7 +4,7 @@ import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page
 import 'package:offroad_nav/design/images.dart';
 
 class RouteSearchWidget extends StatefulWidget {
-  const RouteSearchWidget({Key? key}) : super(key: key);
+  const RouteSearchWidget({super.key});
 
   @override
   State<RouteSearchWidget> createState() => _RouteSearchWidgetState();

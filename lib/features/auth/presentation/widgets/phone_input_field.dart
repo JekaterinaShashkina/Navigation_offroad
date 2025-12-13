@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/images.dart';
 import 'package:offroad_nav/design/styles.dart';
-import 'package:offroad_nav/models/country_code.dart';
-import 'package:offroad_nav/utils/validators.dart';
+import 'package:offroad_nav/core/utils/country_code.dart';
+import 'package:offroad_nav/core/utils/validators.dart';
 
 class PhoneInputField extends StatefulWidget {
   final TextEditingController? controller;

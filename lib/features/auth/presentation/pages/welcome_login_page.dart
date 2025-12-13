@@ -2,9 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
-//import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
-import 'package:offroad_nav/design/widgets/onboard_card.dart';
+import 'package:offroad_nav/features/auth/presentation/widgets/onboard_card.dart';
 
 class WelcomeLoginPage extends StatelessWidget {
   const WelcomeLoginPage({super.key});

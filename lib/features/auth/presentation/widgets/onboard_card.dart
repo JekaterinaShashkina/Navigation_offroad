@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/images.dart';
 import 'package:offroad_nav/design/styles.dart';
 
 class OnboardCard extends StatelessWidget {

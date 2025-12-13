@@ -6,7 +6,7 @@ import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
-import 'package:offroad_nav/design/widgets/pill.dart';
+import 'package:offroad_nav/features/routes/presentation/widgets/pill.dart';
 import 'package:offroad_nav/features/routes/presentation/controller/routes_controller.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/route_card.dart';
 import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page.dart';

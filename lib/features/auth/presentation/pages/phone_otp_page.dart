@@ -9,8 +9,8 @@ import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
 import 'package:offroad_nav/features/auth/presentation/widgets/auth_card.dart';
-import 'package:offroad_nav/services/phone_auth_service.dart';
-import 'package:offroad_nav/services/user_repository.dart'; // ← для upsert после link
+import 'package:offroad_nav/features/auth/data/services/phone_auth_service.dart';
+import 'package:offroad_nav/features/auth/data/repositories/user_repository.dart'; // ← для upsert после link
 
 class PhoneOtpPage extends StatefulWidget {
   const PhoneOtpPage({super.key});

@@ -15,7 +15,7 @@ import 'package:offroad_nav/features/profile/presentation/pages/membership_page.
 import 'package:offroad_nav/features/home/presentation/pages/main_screen.dart';
 
 // импорт сервиса профиля (путь поправь, если другой)
-import 'package:offroad_nav/services/user_profile_service.dart';
+import 'package:offroad_nav/features/profile/data/services/user_profile_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});

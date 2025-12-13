@@ -10,7 +10,7 @@ import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
 import 'package:offroad_nav/features/auth/presentation/widgets/auth_card.dart';
 import 'package:offroad_nav/features/auth/presentation/widgets/auth_text_field.dart';
-import 'package:offroad_nav/utils/validators.dart';
+import 'package:offroad_nav/core/utils/validators.dart';
 
 import 'package:offroad_nav/features/auth/presentation/controllers/auth_controller.dart';
 

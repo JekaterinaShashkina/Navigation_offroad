@@ -15,11 +15,11 @@ import 'package:offroad_nav/features/auth/presentation/widgets/auth_card.dart';
 import 'package:offroad_nav/features/auth/presentation/widgets/auth_text_field.dart';
 import 'package:offroad_nav/design/widgets/avatar_circle.dart';
 import 'package:offroad_nav/features/auth/presentation/widgets/phone_input_field.dart';
-import 'package:offroad_nav/design/widgets/verify_toggle_button.dart';
-import 'package:offroad_nav/models/country_code.dart';
+import 'package:offroad_nav/features/auth/presentation/widgets/verify_toggle_button.dart';
+import 'package:offroad_nav/core/utils/country_code.dart';
 import 'package:offroad_nav/features/auth/presentation/pages/sign_up_success_page.dart';
-import 'package:offroad_nav/services/phone_link_service.dart';
-import 'package:offroad_nav/utils/validators.dart';
+import 'package:offroad_nav/features/auth/data/services/phone_link_service.dart';
+import 'package:offroad_nav/core/utils/validators.dart';
 
 import 'package:offroad_nav/features/auth/presentation/controllers/auth_controller.dart';
 

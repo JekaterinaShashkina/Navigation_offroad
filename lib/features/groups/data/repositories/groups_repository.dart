@@ -211,4 +211,5 @@ Future<void> addMemberToGroup({
         // TODO: по уму — пройтись по подколлекции members и тоже подчистить
     // (через батчи или Cloud Function).
   }
+
 }

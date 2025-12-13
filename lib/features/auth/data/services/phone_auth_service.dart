@@ -1,7 +1,7 @@
 // services/phone_auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:offroad_nav/services/user_repository.dart';
+import 'package:offroad_nav/features/auth/data/repositories/user_repository.dart';
 
 class PhoneAuthService {
   PhoneAuthService._();

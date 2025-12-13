@@ -2,8 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../services/phone_auth_service.dart';
-import '../../data/auth_repository.dart';
+import '../../data/services/phone_auth_service.dart';
+import '../../data/repositories/auth_repository.dart';
 
 class AuthState {
   final bool loading;

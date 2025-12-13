@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/styles.dart';
-import 'package:offroad_nav/design/widgets/friend_item.dart';
+import 'package:offroad_nav/features/friends/presentation/widgets/friend_item.dart';
 import 'package:offroad_nav/features/friends/data/repositories/friend_requests_repository.dart';
 import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
 

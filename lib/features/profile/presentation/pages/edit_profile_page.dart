@@ -7,7 +7,7 @@ import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
 
 // сервис + модель
-import 'package:offroad_nav/services/user_profile_service.dart';
+import 'package:offroad_nav/features/profile/data/services/user_profile_service.dart';
 
 class EditProfilePage extends StatefulWidget {
   final UserProfile profile;

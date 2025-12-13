@@ -11,6 +11,9 @@ import 'package:offroad_nav/features/groups/domain/entities/group.dart';
 import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
 
 import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
+import 'package:offroad_nav/features/groups/presentation/pages/group_chat_page.dart';
+import 'package:offroad_nav/features/groups/presentation/pages/group_general_settings_page.dart';
+import 'package:offroad_nav/features/groups/presentation/pages/group_management_dialog.dart';
 import 'package:offroad_nav/features/groups/presentation/pages/group_member_page.dart';
 import 'package:offroad_nav/features/groups/presentation/pages/group_routes_page.dart';
 import 'package:offroad_nav/features/groups/presentation/widgets/group_header.dart';
@@ -121,7 +124,16 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                   title: 'General Settings',
                   icon: Icons.settings,
                   onTap: _isLeader(group)
-                      ? () => _showGeneralSettingsDialog()
+                      ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GroupGeneralSettingsPage(
+                          group: group,
+                        ),
+                      ),
+                    );
+                  }
                       : null,
                 ),
                 GroupMenuSection(
@@ -152,8 +164,23 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                     );
                   },
                 ),
-                _buildChatSection(),
-                _buildGroupManagementSection(group),
+                                GroupMenuSection(
+                  title: 'Chat',
+                  icon: Icons.route,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GroupChatPage(group: group),
+                      ),
+                    );
+                  },
+                ),
+                GroupMenuSection(
+                  title: 'Group Management',
+                  icon: Icons.route,
+                  onTap: () => _showGroupManagement(group)
+                ),
               ],
             ),
           );
@@ -161,201 +188,33 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
       ),
     );
   }
+void _showGroupManagement(Group group) {
+  showGroupManagementDialog(
+    context: context,
+    ref: ref,
+    group: group,
+    isLeader: _isLeader(group),
+    onLeaveGroup: () => _leaveGroup(group),
+  );
+}
 
+Future<void> _leaveGroup(Group group) async {
+  if (_currentUserId == null) return;
+  final repo = ref.read(groupsRepositoryProvider);
 
-  // ---------- sections ----------
+  await repo.removeMemberFromGroup(
+    group.id,
+    _currentUserId!,
+  );
 
-  Widget _buildSection({
-    required String title,
-    required IconData icon,
-    VoidCallback? onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: padding16,
-        vertical: padding8,
-      ),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(radius12),
-        border: Border.all(color: listShadowColor, width: 1),
-      ),
-      child: ListTile(
-        leading:
-            Icon(icon, color: onTap != null ? textMainColor : textHintColor),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: fontSize16,
-            fontWeight: FontWeight.w500,
-            color: onTap != null ? textMainColor : textHintColor,
-          ),
-        ),
-        trailing: onTap != null
-            ? const Icon(Icons.arrow_forward_ios,
-                size: 16, color: textHintColor)
-            : null,
-        onTap: onTap,
-      ),
-    );
-  }
+  if (!mounted) return;
 
-  Widget _buildChatSection() {
-    return _buildSection(
-      title: 'Chat',
-      icon: Icons.chat,
-      onTap: _openChat,
-    );
-  }
-
-  Widget _buildGroupManagementSection(Group group) {
-    return _buildSection(
-      title: 'Group Management',
-      icon: Icons.group_work,
-      onTap: () => _showGroupManagementDialog(group),
-    );
-  }
-
-  // ---------- dialogs / actions ----------
-
-  void _showGeneralSettingsDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => const AlertDialog(
-        title: Text('General Settings'),
-        content: Text(
-          'Edit group name and avatar functionality will be implemented later.',
-        ),
-      ),
-    );
-  }
-
-  void _leaveGroup(Group group) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Leave Group'),
-        content: const Text('Are you sure you want to leave this group?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              if (_currentUserId == null) return;
-              final repo = ref.read(groupsRepositoryProvider);
-              await repo.removeMemberFromGroup(
-                group.id,
-                _currentUserId!,
-              );
-              if (mounted) {
-                Navigator.pop(context); // back to groups list
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('You left the group'),
-                    backgroundColor: buttonBackgroundColor,
-                  ),
-                );
-              }
-            },
-            child: const Text('Leave', style: TextStyle(color: errorColor)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------- chat / management ----------
-
-  void _openChat() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Group chat functionality will be implemented'),
-        backgroundColor: buttonBackgroundColor,
-      ),
-    );
-  }
-
-  void _showGroupManagementDialog(Group group) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Group Management'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_isLeader(group))
-              ListTile(
-                leading: const Icon(Icons.delete, color: errorColor),
-                title: const Text(
-                  'Delete Group',
-                  style: TextStyle(color: errorColor),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showDeleteGroupDialog(group);
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.exit_to_app, color: errorColor),
-              title: const Text(
-                'Leave Group',
-                style: TextStyle(color: errorColor),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _leaveGroup(group);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteGroupDialog(Group group) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete Group'),
-        content: const Text(
-          'Are you sure you want to delete this group? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final repo = ref.read(groupsRepositoryProvider);
-              await repo.deleteGroup(group.id);
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Group deleted'),
-                    backgroundColor: errorColor,
-                  ),
-                );
-              }
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: errorColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Navigator.pop(context); // back to groups list
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('You left the group'),
+      backgroundColor: buttonBackgroundColor,
+    ),
+  );
+}
 }
