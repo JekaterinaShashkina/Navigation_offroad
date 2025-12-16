@@ -3,11 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/features/competition/application/providers/competitions_providers.dart';
-import 'package:offroad_nav/features/competition/data/repositories/competitions_repository.dart';
 import 'package:offroad_nav/features/competition/presentation/widgets/competition_form_fields.dart';
+import 'package:offroad_nav/features/competition/presentation/widgets/create_competition_action.dart';
 import 'package:offroad_nav/features/competition/presentation/widgets/route_mode_switcher.dart';
+import 'package:offroad_nav/features/competition/presentation/widgets/route_source_switcher.dart';
+import 'package:offroad_nav/features/competition/presentation/widgets/time_limit_picker.dart';
 import 'package:offroad_nav/features/competition/presentation/widgets/vehicle_selector.dart';
+import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/route_creation_page.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/route_planner_page.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/routes_list_page.dart';
 
 class CreateCompetitionPage extends ConsumerStatefulWidget {
   const CreateCompetitionPage({super.key});
@@ -20,6 +25,8 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _desc = TextEditingController();
+  RouteSource _routeSource = RouteSource.choose;
+  RouteEntity? _selectedRoute;
 
   // Rules
   final _rules = const <String>[
@@ -71,82 +78,67 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
     });
   }
 
-  Future<void> _pickLimit() async {
-    final options = <Duration>[
-      const Duration(minutes: 30),
-      const Duration(hours: 1),
-      const Duration(hours: 2),
-      const Duration(hours: 3),
-    ];
-    final res = await showModalBottomSheet<Duration>(
-      context: context,
-      backgroundColor: surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  Future<RouteEntity?> _openChooseRoute() async {
+  final route = await Navigator.push<RouteEntity>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const RoutesListPage(
+        selectionMode: true, // важно, чтобы страница возвращала RouteEntity
       ),
-      builder: (_) => ListView(
-        shrinkWrap: true,
-        children: [
-          const SizedBox(height: 8),
-          const Center(
-            child: Text(
-              'Time limit',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(height: 8),
-          for (final d in options)
-            ListTile(
-              title: Text('${d.inHours > 0 ? '${d.inHours}h ' : ''}${d.inMinutes % 60}m'),
-              onTap: () => Navigator.pop(context, d),
-            ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-    if (res != null) setState(() => _limit = res);
-  }
+    ),
+  );
+  return route;
+}
 
-  // ---------- submit через репозиторий ----------
-  Future<void> _create() async {
-    if (_submitting) return;
-    if (!_form.currentState!.validate()) return;
+ // ---------- Create competition----------
+Future<void> _create() async {
+  if (_submitting) return;
 
-    final repo = ref.read(competitionsRepositoryProvider);
+  await submitCompetition(
+    ref: ref,
+    context: context,
+    formKey: _form,
+    nameCtrl: _name,
+    descCtrl: _desc,
+    rule: _rule,
+    startTime: _startTime,
+    useLimit: _useLimit,
+    limit: _limit,
+    vehicle: _vehicle,
+    setSubmitting: (v) => setState(() => _submitting = v),
+  );
+}
 
-    setState(() => _submitting = true);
-    try {
-      await repo.createCompetition(
-        CompetitionCreateParams(
-          title: _name.text,
-          description: _desc.text,
-          rule: _rule,
-          startTime: _startTime,
-          useLimit: _useLimit,
-          limit: _useLimit ? _limit : null,
-          vehicle: _vehicle,
+Widget _buildRouteModeSheet() {
+  return SafeArea(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 12),
+        const Text(
+          'Create route',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
-      );
+        const SizedBox(height: 12),
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Competition created')),
-      );
-      Navigator.pop(context);
-    } on UnauthenticatedCompetitionException {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
+        ListTile(
+          title: const Text('Drive'),
+          leading: const Icon(Icons.directions_car),
+          onTap: () => Navigator.pop(context, RouteMode.drive),
+        ),
+
+        ListTile(
+          title: const Text('Waypoints'),
+          leading: const Icon(Icons.pin_drop_outlined),
+          onTap: () => Navigator.pop(context, RouteMode.waypoints),
+        ),
+
+        const SizedBox(height: 12),
+      ],
+    ),
+  );
+}
+
 
   // ---------- UI ----------
   @override
@@ -221,21 +213,9 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
               ],
             ),
             if (_useLimit) ...[
-              InkWell(
-                borderRadius: BorderRadius.circular(24),
-                onTap: _pickLimit,
-                child: PillBox(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${_limit.inHours > 0 ? '${_limit.inHours}h ' : ''}${_limit.inMinutes % 60}m',
-                        ),
-                      ),
-                      const Icon(Icons.timer_rounded, color: textHintColor),
-                    ],
-                  ),
-                ),
+              TimeLimitPicker(
+                value: _limit,
+                onChanged: (d) => setState(() => _limit = d),
               ),
               const SizedBox(height: 12),
             ],
@@ -250,11 +230,31 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
 
             FormFieldLabel('Make a route'),
             const SizedBox(height: 8),
-            RouteModeSwitcher(
-              value: _mode, 
-              onChanged: (m) => setState(() => _mode = m),
+            RouteSourceSwitcher(
+                value: _routeSource,
+                onChanged: (s) async {
+                  setState(() => _routeSource = s);
 
+                  if (s == RouteSource.choose) {
+                    // Открываем список маршрутов
+                    final route = await _openChooseRoute();
+                    if (!mounted || route == null) return;
+                    setState(() => _selectedRoute = route);
+                  } else {
+                    // Открываем флоу создания маршрута (Drive / Waypoints)
+                    final route = await _openCreateRouteFlow();
+                    if (!mounted || route == null) return;
+                    setState(() => _selectedRoute = route);
+                  }
+                },
             ),
+            if (_selectedRoute != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Selected route: ${_selectedRoute!.name}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
             const SizedBox(height: 80),
           ],
         ),
@@ -266,7 +266,7 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
         child: SizedBox(
           height: 50,
           child: ElevatedButton(
-            onPressed: _submitting ? null : _create,
+            onPressed: _submitting ? null : _onCreatePressed,
             style: ElevatedButton.styleFrom(
               backgroundColor: buttonSecondBackgroundColor,
               shape: const StadiumBorder(),
@@ -283,4 +283,56 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
       ),
     );
   }
+
+  Future<RouteEntity?> _openCreateRouteFlow() async {
+  // тут можно показать bottom sheet с выбором:
+  // Drive / Waypoints
+  final mode = await showModalBottomSheet<RouteMode>(
+    context: context,
+    shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  ),
+    builder: (_) => _buildRouteModeSheet(), // или просто два ListTile
+  );
+
+  if (mode == null) return null;
+
+  if (mode == RouteMode.drive) {
+    // открыть экран записи маршрута
+    final route = await Navigator.push<RouteEntity>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const RouteCreationPage(
+          // сделай там Navigator.pop(context, createdRoute);
+        ),
+      ),
+    );
+    return route;
+  } else {
+    // открыть экран планировщика точками
+    final route = await Navigator.push<RouteEntity>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const RoutePlannerPage(
+          // и там тоже вернуть RouteEntity через Navigator.pop
+        ),
+      ),
+    );
+    return route;
+  }
+}
+
+  Future<void> _onCreatePressed() async {
+  if (_submitting) return;
+
+  if (_selectedRoute == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please choose or create a route')),
+    );
+    return;
+  }
+
+  await _create(); // здесь уже submitCompetition
+}
+
 }

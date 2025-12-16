@@ -1,10 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-//import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:offroad_nav/features/routes/data/repositories/routes_repository.dart';
-
-//import '../../data/models/route_model.dart';
 import '../../domain/entities/route_entity.dart';
 
 class RoutesState {
@@ -38,6 +35,7 @@ final routesControllerProvider =
 
 class RoutesController extends Notifier<RoutesState> {
   final _repo = RoutesRepository();
+  
   StreamSubscription<List<RouteEntity>>? _sub;
 
   @override
@@ -66,6 +64,51 @@ class RoutesController extends Notifier<RoutesState> {
 
     // пока стрим не дал данные — показываем лоадер
     return const RoutesState(loading: true);
+  }
+
+  Future<void> togglePrivacy(RouteEntity route) async {
+    final newValue = !route.isPublic;
+
+    // оптимистично обновляем локальный стейт
+    state = state.copy(
+      routes: [
+        for (final r in state.routes)
+          if (r.id == route.id)
+            r.copyWith(isPublic: newValue) // нужен copyWith у RouteEntity
+          else
+            r,
+      ],
+      error: null,
+    );
+
+    try {
+      await _repo.setPrivacy(route.id, newValue);
+      // стрим потом всё равно пришлёт актуальное состояние
+    } catch (e) {
+      // по желанию можно откатить
+      state = state.copy(error: 'Failed to update privacy: $e');
+    }
+  }
+
+  Future<void> deleteRoute(String id) async {
+    // оптимистично убираем маршрут из списка
+    final updated = [
+      for (final r in state.routes)
+        if (r.id != id) r,
+    ];
+
+    state = state.copy(
+      routes: updated,
+      error: null,
+    );
+
+    try {
+      await _repo.deleteRoute(id);
+      // стрим потом всё равно подтянет актуальное состояние
+    } catch (e) {
+      state = state.copy(error: 'Failed to delete route: $e');
+      // по желанию можно откатить список назад
+    }
   }
 
   /// Формальный reload — стрим и так отдаст обновления,

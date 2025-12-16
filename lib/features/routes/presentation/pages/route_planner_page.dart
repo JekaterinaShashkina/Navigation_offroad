@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:offroad_nav/design/images.dart';
 
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/colors.dart';
@@ -118,7 +119,7 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
   void initState() {
     super.initState();
     _initDot();
-    _centerToMyLocation();
+    // _centerToMyLocation();
   }
 
   Future<void> _initDot() async {
@@ -273,7 +274,10 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
           GoogleMap(
             mapType: MapType.hybrid,
             initialCameraPosition: CameraPosition(target: _camera, zoom: 12),
-            onMapCreated: (c) => _map = c,
+            onMapCreated: (c) {
+              _map = c;
+              _centerToMyLocation();  // вызываем ТУТ, когда карта уже есть
+            },
             markers: markers,
             polylines: polylines,
             onLongPress: _onAddPoint,
@@ -326,11 +330,22 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
             child: SafeArea(
               top: false,
               child: RouteActionBar(
-                onSave: _save,
-                onToggleGo: null,
-                onDelete: points.isEmpty ? null : _onClear,
-                canSave: points.length >= 2,
-                canDelete: points.isNotEmpty,
+                actions: [
+                  ActionButtonConfig(
+                    label: 'Save',
+                    iconWidget: saveIconNavigation,
+                    onTap: points.length >= 2 ? _save : null,
+                    enabled: points.length >= 2,
+                    filled: points.length >= 2,
+                  ),
+                  ActionButtonConfig(
+                    label: 'Delete',
+                    iconWidget: deleteIconNavigation,
+                    onTap: points.isNotEmpty ? _onClear : null,
+                    enabled: points.isNotEmpty,
+                    filled: false,
+                  ),
+                ],
               ),
             ),
           ),

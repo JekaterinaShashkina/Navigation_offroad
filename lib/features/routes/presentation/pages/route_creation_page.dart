@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:offroad_nav/design/images.dart';
 
 import 'package:offroad_nav/features/routes/application/controllers/tracker_controller.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
@@ -179,15 +180,32 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
                     return SizedBox(
                       width: 327,
                       child: RouteActionBar(
-                        isRecording: _ctrl.isRecording,
-                        onSave: _ctrl.track.length >= 2 ? _save : null,
-                        onToggleGo: () => _ctrl.isRecording
-                            ? _ctrl.pauseRecording()
-                            : _ctrl.startRecording(),
-                        onDelete:
-                            _ctrl.track.isNotEmpty ? _ctrl.clearTrack : null,
-                        canSave: _ctrl.track.length >= 2,
-                        canDelete: _ctrl.track.isNotEmpty,
+                        actions: [
+                          ActionButtonConfig(
+                            label: 'Save',
+                            iconWidget: saveIconNavigation,
+                            onTap: _ctrl.track.length >= 2 ? _save : null,
+                            enabled: _ctrl.track.length >= 2,
+                            filled: _ctrl.track.length >= 2,
+                          ),
+                          ActionButtonConfig(
+                            label: _ctrl.isRecording ? 'Pause' : 'Go',
+                            iconWidget:
+                                _ctrl.isRecording ? pauseIconNavigation : goIconNavigation,
+                            onTap: () => _ctrl.isRecording
+                                ? _ctrl.pauseRecording()
+                                : _ctrl.startRecording(),
+                            enabled: true,
+                            filled: _ctrl.isRecording,
+                          ),
+                          ActionButtonConfig(
+                            label: 'Delete',
+                            iconWidget: deleteIconNavigation,
+                            onTap: _ctrl.track.isNotEmpty ? _ctrl.clearTrack : null,
+                            enabled: _ctrl.track.isNotEmpty,
+                            filled: false,
+                          ),
+                        ],
                       ),
                     );
                   },

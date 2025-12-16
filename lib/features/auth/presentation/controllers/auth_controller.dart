@@ -123,7 +123,7 @@ class AuthController extends Notifier<AuthState> {
     }
   }
   /// 🟦 Google
-  Future<void> signInWithGoogle(BuildContext context) async {
+  Future<void>  signInWithGoogle(BuildContext context) async {
     state = state.copyWith(loading: true, error: null);
 
     try {

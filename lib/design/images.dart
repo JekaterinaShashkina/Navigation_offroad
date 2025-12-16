@@ -396,6 +396,13 @@ final SvgPicture goIconNavigation = SvgPicture.asset(
   fit: BoxFit.contain,
 );
 
+final SvgPicture settingsIconNavigation = SvgPicture.asset(
+  'assets/images/settings_icon.svg',
+  width: 21,
+  height: 21,
+  fit: BoxFit.contain,
+);
+
 final SvgPicture motoIcon = SvgPicture.asset(
   'assets/images/moto_icon.svg',
   width: 56,

@@ -32,6 +32,11 @@ class TrackerController extends ChangeNotifier {
   double _markerRot = 0;       // сглажённый курс, deg
   double _compassDeg = 0;      // последний heading компаса, deg
   int _lastUpdateMs = 0;
+  
+// 🔽 НОВОЕ
+double _lastSpeedMps = 0;
+double get speedMps => _lastSpeedMps;
+double get speedKmh => _lastSpeedMps * 3.6;
 
   bool _followMe = true;
   bool _isRecording = false;
@@ -131,7 +136,8 @@ class TrackerController extends ChangeNotifier {
     }
 
     // --- курс ---
-    final speed = (l.speed ?? 0);        // м/с
+    final speed = (l.speed ?? 0).toDouble(); // м/с
+    _lastSpeedMps = speed;                   // 🔽 запоминаем скорость
     final locHeading = l.heading;        // может быть null
     double targetDeg = _compassDeg;      // по умолчанию — компас (стоит)
 

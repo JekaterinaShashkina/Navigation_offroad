@@ -15,7 +15,8 @@ import 'package:offroad_nav/features/routes/data/repositories/routes_repository.
 enum RoutesTab { all, mine }
 
 class RoutesListPage extends ConsumerStatefulWidget {
-  const RoutesListPage({super.key});
+  final bool selectionMode;
+  const RoutesListPage({super.key, this.selectionMode = false,});
 
   @override
   ConsumerState<RoutesListPage> createState() => _RoutesListPageState();
@@ -34,7 +35,7 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
   @override
   Widget build(BuildContext context) {
     final routesState = ref.watch(routesControllerProvider);
-    final repo = RoutesRepository();
+    // final repo = RoutesRepository();
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     // 1) фильтр по табу
@@ -138,37 +139,32 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
                       route: route,
                       isOwner: isOwner,
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => RouteDetailPage(
-                              name: route.name,
-                              points: route.points
-                                  .map((p) => {
-                                        'lat': p.lat,
-                                        'lng': p.lng,
-                                      })
-                                  .toList(),
+                        if (widget.selectionMode) {
+                          Navigator.pop(context, route); // вернуть выбранный маршрут
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RouteDetailPage(
+                                name: route.name,
+                                points: route.points
+                                    .map((p) => {'lat': p.lat, 'lng': p.lng})
+                                    .toList(),
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                        }
                       },
                       onToggleVisibility: isOwner
                           ? () async {
-                              await repo.setPrivacy(
-                                route.id,
-                                !route.isPublic,
-                              );
-                              // перезагрузим список
                               await ref
                                   .read(routesControllerProvider.notifier)
-                                  .reload();
+                                  .togglePrivacy(route);
                             }
                           : null,
                       onDelete: isOwner
                           ? () => _confirmDelete(
                                 context,
-                                repo,
                                 route.id,
                                 ref,
                               )
@@ -194,7 +190,6 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
 
   void _confirmDelete(
     BuildContext context,
-    RoutesRepository repo,
     String routeId,
     WidgetRef ref,
   ) {
@@ -211,7 +206,6 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
           ),
           TextButton(
             onPressed: () async {
-              await repo.deleteRoute(routeId);
               await ref
                   .read(routesControllerProvider.notifier)
                   .reload();
