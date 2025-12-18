@@ -2,15 +2,22 @@ import 'dart:async';
 import 'dart:math' show cos, sqrt, asin, sin, atan2, pi;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:location/location.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/live_tracking_source.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/sim_tracking_source.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/tracking_sample.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/tracking_source.dart';
+import 'package:offroad_nav/features/routes/presentation/utils/marker_icon.dart';
 
 import '../../../../design/widgets/app_bar.dart';
 import '../../data/repositories/route_tracking_repository.dart';
 
-class RouteTrackingPage extends StatefulWidget {
-  final List<LatLng> points;
+enum TrackingMode { simulated, live }
 
-  const RouteTrackingPage({super.key, required this.points});
+class RouteTrackingPage extends StatefulWidget {
+  final List<LatLng> points;  
+  final TrackingMode  mode;
+
+  const RouteTrackingPage({super.key, required this.points, this.mode = TrackingMode.simulated,});
 
   @override
   State<RouteTrackingPage> createState() => _RouteTrackingPageState();
@@ -18,101 +25,57 @@ class RouteTrackingPage extends StatefulWidget {
 
 class _RouteTrackingPageState extends State<RouteTrackingPage> {
   GoogleMapController? _controller;
-  Location _location = Location();
   LatLng? _currentPosition;
   double _bearing = 0.0;
-  StreamSubscription<LocationData>? _locationSub;
-  Timer? _simulationTimer;
   BitmapDescriptor? _customMarkerIcon;
 
   List<LatLng> traversedPoints = [];
   Duration eta = Duration.zero;
   double remainingDistance = 0.0;
   DateTime? _startTime;
-  int _simulationIndex = 0;
-  final bool simulate = true;
+
+  late final ITrackingSource _source;
+StreamSubscription<TrackSample>? _sub;
 
   @override
   void initState() {
     super.initState();
     _loadCustomMarker();
-    _initLocationTracking();
+   // _initLocationTracking();
+
+  _source = widget.mode == TrackingMode.simulated
+      ? SimTrackingSource(points: widget.points)
+      : LiveTrackingSource();
+
+  _sub = _source.watch().listen((s) {
+    setState(() {
+      _currentPosition = s.pos;
+      _bearing = s.bearingDeg;
+      _startTime ??= DateTime.now();
+    });
+    _updateCameraPosition();
+    _updateRouteProgress(s.pos);
+    _sendToFirebase(s.pos); // если хочешь отправлять и в симуляции тоже
+  });
   }
 
   Future<void> _loadCustomMarker() async {
-    final bitmap = await BitmapDescriptor.fromAssetImage(
-      const ImageConfiguration(size: Size(48, 48)),
-      'assets/images/navigation_arrow.png',
-    );
-    setState(() {
-      _customMarkerIcon = bitmap;
-    });
+  final bitmap = await MarkerIcon.fromPngAsset(
+    'assets/images/navigation_arrow.png',
+    widthPx: 36,
+    heightPx: 36,
+  );
+
+  if (!mounted) return;
+  setState(() => _customMarkerIcon = bitmap);
   }
 
-  Future<void> _initLocationTracking() async {
-    if (simulate) {
-      _startTime = DateTime.now();
-      _startSimulation(widget.points);
-      return;
-    }
-
-  bool _serviceEnabled = await _location.serviceEnabled();
-    if (!_serviceEnabled) {
-      _serviceEnabled = await _location.requestService();
-      if (!_serviceEnabled) return;
-    }
-
-  PermissionStatus _permissionGranted = await _location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      _permissionGranted = await _location.requestPermission();
-      if (_permissionGranted != PermissionStatus.granted) return;
-    }
-
-    _locationSub = _location.onLocationChanged.listen((loc) {
-      final newPosition = LatLng(loc.latitude!, loc.longitude!);
-      _updateBearing(_currentPosition, newPosition);
-      setState(() => _currentPosition = newPosition);
-      _updateCameraPosition();
-      _updateRouteProgress(newPosition);
-      _sendToFirebase(newPosition);
-    });
-  }
-
-  void _startSimulation(List<LatLng> points) {
-    _simulationTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (_simulationIndex >= points.length) {
-        timer.cancel();
-        return;
-      }
-
-      final simulatedPos = points[_simulationIndex];
-      final previousPos = _simulationIndex > 0 ? points[_simulationIndex - 1] : simulatedPos;
-      _simulationIndex++;
-
-      _updateBearing(previousPos, simulatedPos);
-      setState(() => _currentPosition = simulatedPos);
-      _updateCameraPosition();
-      _updateRouteProgress(simulatedPos);
-      _sendToFirebase(simulatedPos);
-    });
-  }
-
-  void _updateBearing(LatLng? from, LatLng to) {
-    if (from == null) return;
-    final dLon = (to.longitude - from.longitude) * pi / 180;
-    final y = sin(dLon) * cos(to.latitude * pi / 180);
-    final x = cos(from.latitude * pi / 180) * sin(to.latitude * pi / 180) -
-        sin(from.latitude * pi / 180) * cos(to.latitude * pi / 180) * cos(dLon);
-    final bearingRad = atan2(y, x);
-    final bearingDeg = (bearingRad * 180 / pi + 360) % 360;
-    setState(() {
-      _bearing = bearingDeg;
-    });
-  }
-
-  LatLng _offsetFromPosition(LatLng position, double distanceMetersForward, double distanceMetersRight, double bearingDegrees) {
+  LatLng _offsetFromPosition(
+    LatLng position, 
+    double distanceMetersForward, 
+    double distanceMetersRight, 
+    double bearingDegrees) {
     const double earthRadius = 6378137.0; // Радиус Земли в метрах
-
     // Конвертация bearing в радианы
     double bearingRad = bearingDegrees * pi / 180;
 
@@ -134,26 +97,18 @@ class _RouteTrackingPageState extends State<RouteTrackingPage> {
   }
 
   void _updateCameraPosition() {
-    if (_currentPosition == null || _controller == null) return;
+  if (_currentPosition == null || _controller == null) return;
 
-    double zoom = 18;
-
-    // Смещаем камеру вперёд на 100м, и вправо 0 (можно менять для точной настройки)
-    double forwardOffsetMeters = 140;  // сдвиг камеры вперед от позиции
-    double rightOffsetMeters = 0;
-
-    LatLng target = _offsetFromPosition(_currentPosition!, forwardOffsetMeters, rightOffsetMeters, _bearing);
-
-    _controller!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: target,
-          zoom: zoom,
-          tilt: 60,
-          bearing: _bearing,
-        ),
+  _controller!.animateCamera(
+    CameraUpdate.newCameraPosition(
+      CameraPosition(
+        target: _currentPosition!,
+        zoom: 18,
+        tilt: 60,
+        bearing: _bearing,
       ),
-    );
+    ),
+  );
   }
 
   void _sendToFirebase(LatLng pos) {
@@ -216,9 +171,9 @@ class _RouteTrackingPageState extends State<RouteTrackingPage> {
 
   @override
   void dispose() {
-    _locationSub?.cancel();
-    _simulationTimer?.cancel();
-    super.dispose();
+  _sub?.cancel();
+  _source.dispose();
+  super.dispose();
   }
 
   @override
@@ -269,7 +224,7 @@ class _RouteTrackingPageState extends State<RouteTrackingPage> {
               Marker(
                 markerId: const MarkerId('me'),
                 position: _currentPosition!,
-                rotation: 0,
+                rotation: _bearing,
                 icon: _customMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
                 anchor: const Offset(0.5, 0.5),
               ),

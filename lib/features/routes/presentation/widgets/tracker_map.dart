@@ -91,6 +91,11 @@ class _TrackerMapState extends State<TrackerMap> {
     return LatLng(p.latitude + dLat, p.longitude + dLon);
   }
 
+    double _normalize(double deg) {
+      deg %= 360;
+      if (deg < 0) deg += 360;
+      return deg;
+    }
   @override
   Widget build(BuildContext context) {
     final pos = widget.controller.currentPos;
@@ -100,11 +105,13 @@ class _TrackerMapState extends State<TrackerMap> {
         Marker(
           markerId: const MarkerId('me'),
           position: pos,
-          rotation: widget.controller.markerRot,
+          flat: true,
+          rotation: _normalize(widget.controller.markerRot - 90),
           icon: widget.arrowIcon ?? BitmapDescriptor.defaultMarker,
           anchor: const Offset(0.5, 0.5),
           zIndex: 10,
         ),
+        
     };
 
     final polylines = <Polyline>{

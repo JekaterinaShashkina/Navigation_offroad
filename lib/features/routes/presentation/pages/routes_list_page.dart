@@ -10,7 +10,6 @@ import 'package:offroad_nav/features/routes/presentation/widgets/pill.dart';
 import 'package:offroad_nav/features/routes/presentation/controller/routes_controller.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/route_card.dart';
 import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page.dart';
-import 'package:offroad_nav/features/routes/data/repositories/routes_repository.dart';
 
 enum RoutesTab { all, mine }
 
@@ -164,9 +163,9 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
                           : null,
                       onDelete: isOwner
                           ? () => _confirmDelete(
-                                context,
-                                route.id,
-                                ref,
+                            context, 
+                            route.id, 
+                            ref
                               )
                           : null,
                     );
@@ -206,9 +205,10 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
           ),
           TextButton(
             onPressed: () async {
-              await ref
-                  .read(routesControllerProvider.notifier)
-                  .reload();
+              await    ref
+                .read(routesControllerProvider.notifier)
+                .deleteRoute(routeId); 
+
               if (context.mounted) Navigator.pop(context);
             },
             child: const Text(

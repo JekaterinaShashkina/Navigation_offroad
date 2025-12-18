@@ -5,8 +5,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/features/routes/presentation/pages/route_tracking_page_live.dart';
-
 import 'package:offroad_nav/features/routes/presentation/widgets/map_right_buttons.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/navigation_bottom_panel.dart';
 import 'package:offroad_nav/features/routes/presentation/pages/route_tracking_page.dart';
@@ -32,8 +30,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
   late final List<LatLng> _routePoints;
   double _routeDistanceKm = 0; // длина маршрута в км
-  late final String _timeText;
-  late final String _distanceText;
 
   @override
   void initState() {
@@ -234,21 +230,12 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                   MaterialPageRoute(
                     builder: (context) => RouteTrackingPage(
                       points: _routePoints,
+                      mode: TrackingMode.simulated,
+                      // mode: TrackingMode.live,
                     ),
                   ),
                 );
               },
-              // Если надо будет включить live-режим:
-              // onGo: () {
-              //   Navigator.push(
-              //     context,
-              //     MaterialPageRoute(
-              //       builder: (context) => RouteTrackingPageLive(
-              //         points: _routePoints,
-              //       ),
-              //     ),
-              //   );
-              // },
               onClose: () => Navigator.pop(context),
             ),
           ),
