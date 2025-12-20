@@ -2,23 +2,68 @@
 import 'dart:math' as math;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-double calcDistanceKm(LatLng a, LatLng b) {
-  const double p = 0.017453292519943295;
-  final double lat1 = a.latitude;
-  final double lon1 = a.longitude;
-  final double lat2 = b.latitude;
-  final double lon2 = b.longitude;
-  final double a1 = 0.5 - math.cos((lat2 - lat1) * p) / 2 +
-      math.cos(lat1 * p) * math.cos(lat2 * p) *
-          (1 - math.cos((lon2 - lon1) * p)) / 2;
-  return 12742 * math.asin(math.sqrt(a1)); // км
+const _R = 6378137.0; // радиус Земли, м
+
+/// расстояние в МЕТРАХ
+double distanceM(LatLng a, LatLng b) {
+  final dLat = (b.latitude - a.latitude) * math.pi / 180;
+  final dLon = (b.longitude - a.longitude) * math.pi / 180;
+  final lat1 = a.latitude * math.pi / 180;
+  final lat2 = b.latitude * math.pi / 180;
+
+  final s1 = math.sin(dLat / 2);
+  final s2 = math.sin(dLon / 2);
+  final h = s1 * s1 + math.cos(lat1) * math.cos(lat2) * s2 * s2;
+  final c = 2 * math.asin(math.min(1.0, math.sqrt(h)));
+
+  return _R * c;
 }
 
-double calcPathLengthKm(List<LatLng> points) {
+/// длина маршрута в МЕТРАХ
+double pathLengthM(List<LatLng> points) {
   if (points.length < 2) return 0;
-  double dist = 0;
+  double sum = 0;
   for (int i = 0; i < points.length - 1; i++) {
-    dist += calcDistanceKm(points[i], points[i + 1]);
+    sum += distanceM(points[i], points[i + 1]);
   }
-  return dist;
+  return sum;
+}
+
+/// азимут 0..360 (СЕВЕР = 0)
+double bearingDeg(LatLng from, LatLng to) {
+  final lat1 = from.latitude * math.pi / 180;
+  final lat2 = to.latitude * math.pi / 180;
+  final dLon = (to.longitude - from.longitude) * math.pi / 180;
+
+  final y = math.sin(dLon) * math.cos(lat2);
+  final x = math.cos(lat1) * math.sin(lat2) -
+      math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+
+  return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+}
+
+/// плавный поворот стрелки
+double lerpAngle(double from, double to, double t) {
+  final diff = ((to - from + 540) % 360) - 180;
+  return (from + diff * t) % 360;
+}
+
+/// расстояние между точками (км)
+double distanceKm(LatLng a, LatLng b) {
+  const p = math.pi / 180;
+  final a1 = 0.5 -
+      math.cos((b.latitude - a.latitude) * p) / 2 +
+      math.cos(a.latitude * p) *
+          math.cos(b.latitude * p) *
+          (1 - math.cos((b.longitude - a.longitude) * p)) / 2;
+  return 12742 * math.asin(math.sqrt(a1));
+}
+
+/// длина маршрута
+double pathLengthKm(List<LatLng> points) {
+  double sum = 0;
+  for (int i = 0; i + 1 < points.length; i++) {
+    sum += distanceKm(points[i], points[i + 1]);
+  }
+  return sum;
 }

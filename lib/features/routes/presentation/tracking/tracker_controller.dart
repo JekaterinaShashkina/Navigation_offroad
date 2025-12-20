@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:offroad_nav/features/routes/presentation/utils/route_math.dart';
 
 /// Контроллер трекинга: выдаёт текущую позицию, сглаженный курс маркера,
 /// follow-режим, запись трека и уведомляет слушателей.
@@ -131,7 +131,7 @@ double get speedKmh => _lastSpeedMps * 3.6;
     final pos = LatLng(la, lo);
 
     // отбрасываем «скачки»
-    if (_lastAcceptedPos != null && _distM(_lastAcceptedPos!, pos) > _MAX_JUMP_M) {
+    if (_lastAcceptedPos != null && distanceM(_lastAcceptedPos!, pos) > _MAX_JUMP_M) {
       return;
     }
 
@@ -145,7 +145,7 @@ double get speedKmh => _lastSpeedMps * 3.6;
       if (locHeading != null && locHeading >= 0) {
         targetDeg = locHeading;          // идеал в движении
       } else if (_lastAcceptedPos != null) {
-        targetDeg = _bearingDeg(_lastAcceptedPos!, pos);
+        targetDeg = bearingDeg(_lastAcceptedPos!, pos);
       }
     }
 
@@ -153,7 +153,7 @@ double get speedKmh => _lastSpeedMps * 3.6;
       targetDeg = (targetDeg + 180) % 360; // докрутка если PNG вниз
     }
 
-    _markerRot = _lerpAngle(_markerRot, targetDeg, _TURN_ALPHA);
+    _markerRot = lerpAngle(_markerRot, targetDeg, _TURN_ALPHA);
 
     // --- позиция ---
     _lastAcceptedPos = _currentPos;
@@ -161,7 +161,7 @@ double get speedKmh => _lastSpeedMps * 3.6;
 
     // запись трека — не чаще, чем каждые ~3м
     if (_isRecording) {
-      if (track.isEmpty || _distM(track.last, pos) > 3) {
+      if (track.isEmpty || distanceM(track.last, pos) > 3) {
         track.add(pos);
       }
     }
@@ -169,33 +169,4 @@ double get speedKmh => _lastSpeedMps * 3.6;
     notifyListeners();
   }
 
-  // ----- математика -----
-
-  double _distM(LatLng a, LatLng b) {
-    const R = 6378137.0;
-    final dLat = (b.latitude - a.latitude) * math.pi / 180.0;
-    final dLon = (b.longitude - a.longitude) * math.pi / 180.0;
-    final la1 = a.latitude * math.pi / 180.0;
-    final la2 = b.latitude * math.pi / 180.0;
-    final s1 = math.sin(dLat / 2);
-    final s2 = math.sin(dLon / 2);
-    final h = s1 * s1 + math.cos(la1) * math.cos(la2) * s2 * s2;
-    final c = 2 * math.asin(math.min(1.0, math.sqrt(h)));
-    return R * c;
-  }
-
-  double _bearingDeg(LatLng a, LatLng b) {
-    final lat1 = a.latitude * (math.pi / 180);
-    final lat2 = b.latitude * (math.pi / 180);
-    final dLon = (b.longitude - a.longitude) * (math.pi / 180);
-    final y = math.sin(dLon) * math.cos(lat2);
-    final x = math.cos(lat1) * math.sin(lat2) -
-        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
-    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
-  }
-
-  double _lerpAngle(double from, double to, double t) {
-    final diff = ((to - from + 540) % 360) - 180; // [-180; +180]
-    return (from + diff * t) % 360;
-  }
 }

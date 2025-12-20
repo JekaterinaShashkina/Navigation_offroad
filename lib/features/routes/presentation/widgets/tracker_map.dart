@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:offroad_nav/features/routes/application/controllers/tracker_controller.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/tracker_controller.dart';
 
 /// Карта для записи трека: рисует текущую позицию, трек, ведёт камеру.
 class TrackerMap extends StatefulWidget {
@@ -106,7 +106,7 @@ class _TrackerMapState extends State<TrackerMap> {
           markerId: const MarkerId('me'),
           position: pos,
           flat: true,
-          rotation: _normalize(widget.controller.markerRot - 90),
+          rotation: _normalize(widget.controller.markerRot),
           icon: widget.arrowIcon ?? BitmapDescriptor.defaultMarker,
           anchor: const Offset(0.5, 0.5),
           zIndex: 10,

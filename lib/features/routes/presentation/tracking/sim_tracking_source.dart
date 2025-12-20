@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'dart:math' as math;
-
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:offroad_nav/features/routes/presentation/utils/route_math.dart';
 
 import 'tracking_sample.dart';
 import 'tracking_source.dart';
@@ -35,8 +34,8 @@ class SimTrackingSource implements ITrackingSource {
       LatLng? next = (_i < points.length) ? points[_i] : null;
 
       final bearing = (next != null)
-    ? _bearing(cur, next)      // <-- ВПЕРЁД
-    : (_prev == null ? 0.0 : _bearing(_prev!, cur));
+    ? bearingDeg(cur, next)      // <-- ВПЕРЁД
+    : (_prev == null ? 0.0 : bearingDeg(_prev!, cur));
       _prev = cur;
 
       _ctrl.add(
@@ -48,20 +47,6 @@ class SimTrackingSource implements ITrackingSource {
     });
 
     return _ctrl.stream;
-  }
-
-  double _bearing(LatLng a, LatLng b) {
-    final lat1 = a.latitude * math.pi / 180.0;
-    final lat2 = b.latitude * math.pi / 180.0;
-    final dLon = (b.longitude - a.longitude) * math.pi / 180.0;
-
-    final y = math.sin(dLon) * math.cos(lat2);
-    final x = math.cos(lat1) * math.sin(lat2) -
-        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
-
-    var brng = math.atan2(y, x) * 180.0 / math.pi;
-    brng = (brng + 360.0) % 360.0;
-    return brng;
   }
 
   @override
