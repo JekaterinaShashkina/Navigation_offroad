@@ -1,10 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/avatars.dart';
 import 'package:offroad_nav/design/widgets/smart_avatar.dart';
 import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
 
@@ -205,7 +203,7 @@ class _GroupMembersPageState extends ConsumerState<GroupMembersPage> {
                 ),
               ),
 
-              /// 🔹 КНОПКИ
+              //* 🔹 КНОПКИ
               if (isLeader && !isOwner)
                 IconButton(
                   icon: const Icon(Icons.close, color: errorColor),
@@ -236,23 +234,6 @@ class _GroupMembersPageState extends ConsumerState<GroupMembersPage> {
     );
   }
 
-  Widget _circleIconButton({
-    required Color color,
-    required IconData icon,
-    required VoidCallback onPressed,
-  }) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      child: IconButton(
-        padding: EdgeInsets.zero,
-        onPressed: onPressed,
-        icon: Icon(icon, color: surfaceColor, size: 16),
-      ),
-    );
-  }
-
 void _showAddMemberDialog(Group group) {
   showDialog(
     context: context,
@@ -280,57 +261,4 @@ void _showAddMemberDialog(Group group) {
   );
 }
 
-
-  Future<void> _removeMemberFromFirestore(Group group, Member member) async {
-    final repo = ref.read(groupsRepositoryProvider);
-    await repo.removeMemberFromGroup(group.id, member.userId);
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${member.name} removed from the group'),
-        backgroundColor: errorColor,
-      ),
-    );
-  }
-
-  void _leaveGroup(Group group) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Leave Group'),
-        content: const Text('Are you sure you want to leave this group?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final currentUserId = widget.currentUserId;
-              if (currentUserId == null) return;
-
-              final repo = ref.read(groupsRepositoryProvider);
-              await repo.removeMemberFromGroup(group.id, currentUserId);
-
-              if (mounted) {
-                Navigator.pop(context); // back to group details
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('You left the group'),
-                    backgroundColor: buttonBackgroundColor,
-                  ),
-                );
-              }
-            },
-            child: const Text(
-              'Leave',
-              style: TextStyle(color: errorColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

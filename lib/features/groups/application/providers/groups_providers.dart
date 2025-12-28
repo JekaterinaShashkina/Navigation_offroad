@@ -6,9 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
 import 'package:offroad_nav/features/groups/data/repositories/groups_live_repository.dart';
 import 'package:offroad_nav/features/groups/domain/entities/group.dart';
-import 'package:offroad_nav/features/groups/domain/entities/live_user.dart';
 import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
-// import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
 import 'package:rxdart/rxdart.dart';
 
 // репозиторий — один на всё приложение.
@@ -149,7 +147,7 @@ final liveUsersWithProfilesProvider =
 final groupOwnerIdProvider =
     StreamProvider.autoDispose.family<String?, String>((ref, groupId) {
   return FirebaseFirestore.instance
-      .collection('groups') // ⚠️ если коллекция у тебя называется иначе — поменяй
+      .collection('groups')
       .doc(groupId)
       .snapshots()
       .map((doc) {

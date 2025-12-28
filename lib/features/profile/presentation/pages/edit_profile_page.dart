@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:offroad_nav/design/colors.dart';
-import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
 import 'package:offroad_nav/design/widgets/app_text_field.dart';
