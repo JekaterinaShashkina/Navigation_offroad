@@ -5,6 +5,7 @@ import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
+import 'package:offroad_nav/design/widgets/app_text_field.dart';
 
 // сервис + модель
 import 'package:offroad_nav/features/profile/data/services/user_profile_service.dart';
@@ -61,28 +62,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     Navigator.pop(context, updated);
   }
 
-  Widget _buildField(String label, TextEditingController controller) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: backgroundMainColor,
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: TextField(
-        controller: controller,
-        style: robotoRegular18TextStyle,
-        decoration: InputDecoration(
-          hintText: label,
-          hintStyle: robotoRegular14TextStyle,
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 4),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,15 +79,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: surfaceColor,
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Column(
                 children: [
-                  _buildField('Name', nameController),
-                  _buildField('Phone', phoneController),
-                  _buildField('Description', descriptionController),
-                  _buildField('Avatar URL', imgController),
+                  AppTextField(hint:'Name', controller: nameController),
+                  AppTextField(hint: 'Phone', controller: phoneController),
+                  AppTextField(hint:'Description', controller: descriptionController),
+                  AppTextField(hint:'Avatar URL', controller: imgController),
                   SwitchListTile(
                     title: const Text('Share location'),
                     value: locationSharing,

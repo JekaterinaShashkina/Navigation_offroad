@@ -12,7 +12,7 @@ import 'package:flutter/material.dart';
 
   class AddMemberDialog extends StatefulWidget {
     final Group group;
-    final Function(Member) onMemberAdded;
+    final ValueChanged<String> onMemberAdded;
 
     const AddMemberDialog({
       super.key,
@@ -84,22 +84,9 @@ import 'package:flutter/material.dart';
     }
 
     void _addMember(Friend friend) {
-      final member = Member(
-        id: friend.uid,
-        name: friend.name,
-        avatarUrl: friend.avatarUrl,
-      );
-
-      widget.onMemberAdded(member);
+      widget.onMemberAdded(friend.uid);
       Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${friend.name} добавлен в группу'),
-          backgroundColor: buttonBackgroundColor,
-        ),
-      );
-    }
+ }
 
     @override
     Widget build(BuildContext context) {

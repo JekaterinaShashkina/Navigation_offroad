@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:offroad_nav/design/images.dart';
-import 'package:offroad_nav/features/routes/presentation/tracking/tracker_controller.dart';
-import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/features/routes/presentation/utils/marker_icon.dart';
-import 'package:offroad_nav/features/routes/presentation/utils/route_math.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/route_action_bar.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/tracker_map.dart';
-import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
-import 'package:offroad_nav/features/routes/data/repositories/routes_repository.dart';
+
+import '../../../../design/images.dart';
+import '../tracking/tracker_controller.dart';
+import '../../../../design/widgets/app_bar.dart';
+import '../utils/marker_icon.dart';
+import '../utils/route_math.dart';
+import '../widgets/route_action_bar.dart';
+import '../widgets/tracker_map.dart';
+import '../../domain/entities/route_entity.dart';
+import '../../data/repositories/routes_repository.dart';
 
 class RouteCreationPage extends StatefulWidget {
   const RouteCreationPage({super.key});

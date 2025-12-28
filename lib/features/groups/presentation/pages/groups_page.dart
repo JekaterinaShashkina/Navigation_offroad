@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:offroad_nav/design/colors.dart';
-import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/widgets/app_bar.dart';
-
-import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
-import 'package:offroad_nav/features/groups/presentation/pages/group_detail_page.dart';
-
-import 'package:offroad_nav/features/groups/domain/entities/group.dart';
-import 'package:offroad_nav/features/groups/presentation/widgets/add_group_card.dart';
-import 'package:offroad_nav/features/groups/presentation/widgets/create_group_dialog.dart';
-import 'package:offroad_nav/features/groups/presentation/widgets/group_card.dart';
+import '../../../../design/colors.dart';
+import '../../../../design/dimension.dart';
+import '../../../../design/widgets/app_bar.dart';
+import '../../application/providers/groups_providers.dart';
+import 'group_detail_page.dart';
+import '../../domain/entities/group.dart';
+import '../widgets/add_group_card.dart';
+import '../widgets/create_group_dialog.dart';
+import '../widgets/group_card.dart';
 
 class GroupsPage extends ConsumerStatefulWidget {
   const GroupsPage({super.key});
@@ -37,7 +35,7 @@ class _GroupsPageState extends ConsumerState<GroupsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final groupsAsync = ref.watch(myGroupsProvider);
+    final groupsAsync = ref.watch(visibleGroupsProvider);
 
     return Scaffold(
       backgroundColor: backgroundMainColor,
@@ -139,7 +137,7 @@ class _GroupsPageState extends ConsumerState<GroupsPage> {
                         );
                       }
 
-                      final group = filtered[index - 1];
+                      final group = filtered[index - 1];                      
                       return GroupCard(
                         group: group,
                         onTap: () => _showGroupDetail(context, group),

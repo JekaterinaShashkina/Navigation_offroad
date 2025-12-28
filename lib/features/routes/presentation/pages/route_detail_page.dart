@@ -3,22 +3,22 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'package:offroad_nav/design/colors.dart';
-import 'package:offroad_nav/design/widgets/app_bar.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/map_right_buttons.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/navigation_bottom_panel.dart';
-import 'package:offroad_nav/features/routes/presentation/pages/route_tracking_page.dart';
-// Если нужна живая навигация — можно будет подключить и это:
-// import 'package:offroad_nav/features/routes/presentation/pages/route_tracking_page_live.dart';
+import '../../../../design/colors.dart';
+import '../../../../design/widgets/app_bar.dart';
+import '../widgets/map_right_buttons.dart';
+import '../widgets/navigation_bottom_panel.dart';
+import 'route_tracking_page.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final String name;           // название маршрута
   final List<dynamic> points;  // список map-ов: { 'lat': double, 'lng': double }
+  final String? groupId;
 
   const RouteDetailPage({
     super.key,
     required this.name,
-    required this.points,
+    required this.points, 
+    this.groupId,
   });
 
   @override
@@ -231,6 +231,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                     builder: (context) => RouteTrackingPage(
                       points: _routePoints,
                       mode: TrackingMode.live,
+                      groupId: widget.groupId,
                       // mode: TrackingMode.live,
                     ),
                   ),

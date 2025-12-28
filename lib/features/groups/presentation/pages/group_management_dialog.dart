@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:offroad_nav/design/colors.dart';
+import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
 import 'package:offroad_nav/features/groups/domain/entities/group.dart';
 import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
 

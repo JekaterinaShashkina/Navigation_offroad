@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:offroad_nav/design/colors.dart';
-import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/widgets/smart_avatar.dart';
-import 'package:offroad_nav/features/groups/domain/entities/group.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
 
-class GroupCard extends StatelessWidget {
+import '../../../../design/colors.dart';
+import '../../../../design/dimension.dart';
+import '../../../../design/widgets/smart_avatar.dart';
+import '../../application/providers/groups_providers.dart';
+import '../../domain/entities/group.dart';
+
+class GroupCard extends ConsumerWidget {
   final Group group;
   final VoidCallback onTap;
 
@@ -15,7 +19,11 @@ class GroupCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.read(groupsRepositoryProvider);
+
+    String membersLabel(int n) => n == 1 ? '1 member' : '$n members';
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(radius16),
@@ -72,6 +80,34 @@ class GroupCard extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
+
+              const SizedBox(height: height8),
+
+              FutureBuilder<int>(
+                future: repo.getMembersCount(group.id),
+                builder: (context, snap) {
+                  final count = snap.data;
+                  if (count == null) {
+                    return const Text(
+                      '—',
+                      style: TextStyle(fontSize: fontSize12, color: textHintColor),
+                    );
+                  }
+
+                  final max = group.maxMembers;
+                  final text = max == null ? membersLabel(count) : '$count/$max';
+
+                  return Text(
+                    text,
+                    style: const TextStyle(
+                      fontSize: fontSize12,
+                      color: textHintColor,
+                    ),
+                    textAlign: TextAlign.center,
+                  );
+                },
+              ),
+
             ],
           ),
         ),

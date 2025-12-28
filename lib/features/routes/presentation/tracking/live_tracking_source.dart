@@ -75,7 +75,7 @@ class LiveTrackingSource implements ITrackingSource {
 
       // NEW: "подойти к старту" — gate
       if (!_startGatePassed && startPoint != null) {
-        final d = distanceM(cur, startPoint!);
+        // final d = distanceM(cur, startPoint!);
           _startGatePassed = true;
           // сброс prev чтобы не было резкого bearing
           _prev = cur;
@@ -87,7 +87,6 @@ class LiveTrackingSource implements ITrackingSource {
         final jump = distanceM(_prev!, cur);
         if (jump > maxJumpM) return;
       }
-
       // bearing + smoothing
       final raw = _prev == null ? _bearingSmoothed : bearingDeg(_prev!, cur);
       _bearingSmoothed = lerpAngle(_bearingSmoothed, raw, 0.25);

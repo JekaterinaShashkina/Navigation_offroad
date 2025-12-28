@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:offroad_nav/design/colors.dart';
-import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/avatars.dart';
-
-import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
-import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
-import 'package:offroad_nav/features/groups/domain/entities/group.dart';
+import '../../../../design/colors.dart';
+import '../../../../design/dimension.dart';
+import '../../../../design/avatars.dart';
+import '../../application/providers/groups_providers.dart';
+import '../../data/repositories/groups_repository.dart';
 
 class CreateGroupDialog extends ConsumerStatefulWidget {
   const CreateGroupDialog({super.key});
@@ -72,7 +69,7 @@ class _CreateGroupDialogState extends ConsumerState<CreateGroupDialog> {
 
             GestureDetector(
               onTap: () async {
-                final chosen = await showAvatarPicker(context);
+                final chosen = await showGroupAvatarPicker(context);
                 if (chosen != null) {
                   setState(() => _selectedAvatar = chosen);
                 }
@@ -82,7 +79,7 @@ class _CreateGroupDialogState extends ConsumerState<CreateGroupDialog> {
                 backgroundColor: Colors.white,
                 child: _selectedAvatar == null
                     ? const Icon(Icons.add_a_photo, color: textHintColor)
-                    : avatarSvg(_selectedAvatar!, size: 48),
+                    : avatarPreview(_selectedAvatar!, size: 48),
               ),
             ),
           ],
@@ -134,11 +131,6 @@ class _CreateGroupDialogState extends ConsumerState<CreateGroupDialog> {
           name: _nameController.text.trim(),
           avatarUrl: _selectedAvatar!,
         ),
-      );
-
-      await repo.addMemberToGroup(
-        groupId: groupId,
-        userId: currentUser.uid,
       );
 
       if (mounted) Navigator.pop(context);

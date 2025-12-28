@@ -9,7 +9,7 @@ class Group {
   final String? competitionId;
   final String? routeId;
    /// Сколько людей в группе (для превью на карточке)
-  final int membersCount;
+  // final int membersCount;
   final int? maxMembers;
   final bool isOpen;
   final String status;
@@ -24,7 +24,7 @@ class Group {
     this.description,
     this.competitionId,
     this.routeId,
-    this.membersCount=0,
+    //this.membersCount=0,
     this.maxMembers,
     required this.isOpen,
     required this.status,
@@ -42,7 +42,7 @@ class Group {
       avatarUrl: (data['avatar_url'] ?? '') as String,
       competitionId: data['competition_id'] as String?,
       routeId: data['route_id'] as String?,
-      membersCount: (data['members_count'] as num?)?.toInt() ?? 0,
+     // membersCount: (data['members_count'] as num?)?.toInt() ?? 0,
       maxMembers: (data['max_members'] as num?)?.toInt(),
       isOpen: data['is_open'] as bool? ?? true,
       status: data['status'] as String? ?? 'active',
@@ -59,7 +59,7 @@ class Group {
       'avatar_url': avatarUrl,
       'competition_id': competitionId,
       'route_id': routeId,
-      'members_count': membersCount,
+     // 'members_count': membersCount,
       'max_members': maxMembers,
       'is_open': isOpen,
       'status': status,
@@ -91,7 +91,7 @@ class Group {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       competitionId: competitionId ?? this.competitionId,
       routeId: routeId ?? this.routeId,
-      membersCount: membersCount ?? this.membersCount,
+    //  membersCount: membersCount ?? this.membersCount,
       maxMembers: maxMembers ?? this.maxMembers,
       isOpen: isOpen ?? this.isOpen,
       status: status ?? this.status,

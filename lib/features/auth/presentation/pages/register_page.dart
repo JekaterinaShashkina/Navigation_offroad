@@ -171,7 +171,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                 radius: 44,
                                 onTap: () async {
                                   final selected =
-                                      await showAvatarPicker(context);
+                                      await showUserAvatarPicker(context);
                                   if (selected == null) return;
                                   setState(
                                     () => _selectedAvatarPath = selected,

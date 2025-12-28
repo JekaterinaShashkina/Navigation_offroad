@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
+import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
 
 import 'package:offroad_nav/features/groups/domain/entities/group.dart';
 import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
@@ -18,7 +19,6 @@ import 'package:offroad_nav/features/groups/presentation/pages/group_member_page
 import 'package:offroad_nav/features/groups/presentation/pages/group_routes_page.dart';
 import 'package:offroad_nav/features/groups/presentation/widgets/group_header.dart';
 import 'package:offroad_nav/features/groups/presentation/widgets/group_menu_section.dart';
-
 
 class GroupDetailPage extends ConsumerStatefulWidget {
   final Group group;
@@ -37,8 +37,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
 
   String? _currentUserId;
   bool _hasFriends = false;
+
+  // leader info
   String? _leaderName;
-  bool _loadingLeader = true;
+  bool _loadingLeader = false;
+  String? _leaderOwnerIdLoaded; // чтобы отслеживать смену ownerId
 
   @override
   void initState() {
@@ -46,33 +49,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
     final user = FirebaseAuth.instance.currentUser;
     _currentUserId = user?.uid;
     _checkFriends();
-    _loadLeaderName();
   }
-
-  Future<void> _loadLeaderName() async {
-  try {
-    final snap = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.group.ownerId) // или group.ownerId, как у тебя называется
-        .get();
-
-    final name = snap.data()?['name'] ?? 'Unknown';
-
-    if (mounted) {
-      setState(() {
-        _leaderName = name;
-        _loadingLeader = false;
-      });
-    }
-  } catch (e) {
-    if (mounted) {
-      setState(() {
-        _leaderName = 'Unknown';
-        _loadingLeader = false;
-      });
-    }
-  }
-}
 
   Future<void> _checkFriends() async {
     if (_currentUserId == null) return;
@@ -81,12 +58,59 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
     setState(() => _hasFriends = hasFriends);
   }
 
-  bool _isLeader(Group g) =>
-      _currentUserId != null && g.ownerId == _currentUserId;
+  bool _isLeader(Group g) => _currentUserId != null && g.ownerId == _currentUserId;
+
+  Future<void> _loadLeaderName(String ownerId) async {
+    setState(() {
+      _loadingLeader = true;
+    });
+
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(ownerId)
+          .get();
+
+      final name = snap.data()?['name'] ?? 'Unknown';
+
+      if (!mounted) return;
+      setState(() {
+        _leaderName = name;
+        _loadingLeader = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _leaderName = 'Unknown';
+        _loadingLeader = false;
+      });
+    }
+  }
+
+  void _ensureLeaderLoaded(String ownerId) {
+    // если ownerId поменялся — надо перезагрузить лидера
+    if (_leaderOwnerIdLoaded != ownerId) {
+      _leaderOwnerIdLoaded = ownerId;
+      _leaderName = null;
+
+      // дергаем после кадра, чтобы не запускать async прямо в build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadLeaderName(ownerId);
+      });
+      return;
+    }
+
+    // ownerId тот же, но имя ещё не загружено
+    if (_leaderName == null && !_loadingLeader) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadLeaderName(ownerId);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final groupsAsync = ref.watch(myGroupsProvider);
+    final groupAsync = ref.watch(groupProvider(widget.group.id));
 
     return Scaffold(
       backgroundColor: backgroundMainColor,
@@ -101,41 +125,47 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
         ),
         onPressed: () => Navigator.pop(context),
       ),
-      body: groupsAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      body: groupAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         error: (e, _) => const Center(
-          child: Text(
-            'Failed to load group',
-            style: TextStyle(color: errorColor),
-          ),
+          child: Text('Failed to load group', style: TextStyle(color: errorColor)),
         ),
-        data: (groups) {
-          final group = groups.firstWhere(
-            (g) => g.id == widget.group.id,
-            orElse: () => widget.group,
-          );
+        data: (group) {
+          if (group == null) {
+            return const Center(
+              child: Text('Group not found', style: TextStyle(color: textHintColor)),
+            );
+          }
+
+          // ✅ лидер всегда актуален
+          _ensureLeaderLoaded(group.ownerId);
+
+          final isLeader = _isLeader(group);
 
           return SingleChildScrollView(
             child: Column(
               children: [
-                GroupHeader(group: group, isLeader: _isLeader(group), leaderName: _leaderName??'Loading',),
+                GroupHeader(
+                  group: group,
+                  isLeader: isLeader,
+                  leaderName: _leaderName ?? (_loadingLeader ? 'Loading...' : 'Unknown'),
+                ),
+
                 GroupMenuSection(
                   title: 'General Settings',
                   icon: Icons.settings,
-                  onTap: _isLeader(group)
+                  onTap: isLeader
                       ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => GroupGeneralSettingsPage(
-                          group: group,
-                        ),
-                      ),
-                    );
-                  }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => GroupGeneralSettingsPage(group: group),
+                            ),
+                          );
+                        }
                       : null,
                 ),
+
                 GroupMenuSection(
                   title: 'Members',
                   icon: Icons.people,
@@ -152,6 +182,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                     );
                   },
                 ),
+
                 GroupMenuSection(
                   title: 'Route',
                   icon: Icons.route,
@@ -164,9 +195,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                     );
                   },
                 ),
-                                GroupMenuSection(
+
+                GroupMenuSection(
                   title: 'Chat',
-                  icon: Icons.route,
+                  icon: Icons.chat_bubble_outline,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -176,10 +208,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
                     );
                   },
                 ),
+
                 GroupMenuSection(
                   title: 'Group Management',
-                  icon: Icons.route,
-                  onTap: () => _showGroupManagement(group)
+                  icon: Icons.admin_panel_settings_outlined,
+                  onTap: () => _showGroupManagement(group),
                 ),
               ],
             ),
@@ -188,33 +221,35 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
       ),
     );
   }
-void _showGroupManagement(Group group) {
-  showGroupManagementDialog(
-    context: context,
-    ref: ref,
-    group: group,
-    isLeader: _isLeader(group),
-    onLeaveGroup: () => _leaveGroup(group),
-  );
-}
 
-Future<void> _leaveGroup(Group group) async {
-  if (_currentUserId == null) return;
-  final repo = ref.read(groupsRepositoryProvider);
+  void _showGroupManagement(Group group) {
+    showGroupManagementDialog(
+      context: context,
+      ref: ref,
+      group: group,
+      isLeader: _isLeader(group),
+      onLeaveGroup: () => _leaveGroup(group),
+    );
+  }
 
-  await repo.removeMemberFromGroup(
-    group.id,
-    _currentUserId!,
-  );
+  Future<void> _leaveGroup(Group group) async {
+    if (_currentUserId == null) return;
 
-  if (!mounted) return;
+    final repo = ref.read(groupsRepositoryProvider);
 
-  Navigator.pop(context); // back to groups list
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('You left the group'),
-      backgroundColor: buttonBackgroundColor,
-    ),
-  );
-}
+    await repo.removeMemberFromGroup(
+      group.id,
+      _currentUserId!,
+    );
+
+    if (!mounted) return;
+
+    Navigator.pop(context); // back to groups list
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You left the group'),
+        backgroundColor: buttonBackgroundColor,
+      ),
+    );
+  }
 }

@@ -7,6 +7,7 @@ class RouteActions {
   static Future<void> openRouteById(
     BuildContext context,
     String routeId,
+    String? groupId,
   ) async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -34,6 +35,7 @@ class RouteActions {
           builder: (_) => RouteDetailPage(
             name: name,
             points: points,
+            groupId: groupId,
           ),
         ),
       );

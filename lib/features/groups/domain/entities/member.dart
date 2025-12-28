@@ -1,29 +1,27 @@
-// lib/features/groups/data/models/member.dart
-
 class Member {
-  final String id;
-  final String name;
-  final String? avatarUrl;
+  final String userId;   // uid пользователя (doc.id в members)
+  final String role;     // owner / member
+  final String name;     // из users коллекции
+  final String? img;     // из users коллекции (assets/...svg или url)
 
   const Member({
-    required this.id,
+    required this.userId,
+    required this.role,
     required this.name,
-    this.avatarUrl,
+    this.img,
   });
 
-  factory Member.fromJson(Map<String, dynamic> json) {
+  Member copyWith({
+    String? userId,
+    String? role,
+    String? name,
+    String? img,
+  }) {
     return Member(
-      id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      avatarUrl: json['avatarUrl'] as String?,
+      userId: userId ?? this.userId,
+      role: role ?? this.role,
+      name: name ?? this.name,
+      img: img ?? this.img,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id'       : id,
-      'name'     : name,
-      'avatarUrl': avatarUrl,
-    };
   }
 }

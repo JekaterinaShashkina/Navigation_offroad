@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/avatars.dart';
+import 'package:offroad_nav/design/widgets/smart_avatar.dart';
+import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
 
 import 'package:offroad_nav/features/groups/domain/entities/group.dart';
 import 'package:offroad_nav/features/groups/domain/entities/member.dart';
@@ -32,6 +34,7 @@ class _GroupMembersPageState extends ConsumerState<GroupMembersPage> {
   Widget build(BuildContext context) {
     final group = widget.group;
     final isLeader = widget.currentUserId == group.ownerId;
+    
 
     return Scaffold(
       backgroundColor: backgroundMainColor,
@@ -48,169 +51,188 @@ class _GroupMembersPageState extends ConsumerState<GroupMembersPage> {
           ),
         ),
         actions: [
-          if (isLeader)
-            IconButton(
-              onPressed:
-                  widget.hasFriends ? () => _showAddMemberDialog(group) : null,
-              icon: Icon(
-                Icons.person_add,
-                color: widget.hasFriends ? textMainColor : textHintColor,
-              ),
+  if (widget.currentUserId != null)
+    StreamBuilder<bool>(
+      stream: ref
+          .read(groupsRepositoryProvider)
+          .watchIsMember(group.id, widget.currentUserId!),
+      builder: (context, snap) {
+        final isMember = snap.data ?? false;
+
+        // Лидер: плюсик добавления друзей
+        if (isLeader) {
+          return IconButton(
+            onPressed: widget.hasFriends ? () => _showAddMemberDialog(group) : null,
+            icon: Icon(
+              Icons.person_add,
+              color: widget.hasFriends ? textMainColor : textHintColor,
             ),
+          );
+        }
+
+        // Не лидер и не участник: кнопка Join
+        if (!isMember) {
+          return IconButton(
+            icon: const Icon(Icons.person_add, color: textMainColor), // или Icons.group_add
+            onPressed: () async {
+              try {
+                await ref.read(groupsRepositoryProvider).joinGroup(
+                      group.id,
+                      // widget.currentUserId!,
+                    );
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('You joined the group')),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to join: $e')),
+                );
+              }
+            },
+          );
+        }
+
+        // Уже участник: ничего не показываем
+        return const SizedBox.shrink();
+      },
+    ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('groups')
-            .doc(group.id)
-            .collection('members')
-            .snapshots(),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            );
-          }
-          if (snap.hasError) {
-            return Center(
-              child: Text(
-                'Failed to load members: ${snap.error}',
-                style: const TextStyle(color: errorColor),
+      body: StreamBuilder<List<Member>>(
+  stream: ref
+      .read(groupsRepositoryProvider)
+      .watchMembers(group.id),
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+
+    if (snapshot.hasError) {
+      return Center(
+        child: Text(
+          'Failed to load members',
+          style: TextStyle(color: errorColor),
+        ),
+      );
+    }
+
+    final members = snapshot.data ?? const [];
+
+    if (members.isEmpty) {
+      return const Center(
+        child: Text(
+          'No members yet',
+          style: TextStyle(color: textHintColor),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(padding16),
+      itemCount: members.length,
+      separatorBuilder: (_, __) => const SizedBox(height: height12),
+      itemBuilder: (context, index) {
+        final member = members[index];
+
+        final isOwner = member.userId == group.ownerId;
+        final isCurrentUser = member.userId == widget.currentUserId;
+
+        return Container(
+          padding: const EdgeInsets.all(padding12),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(radius12),
+            border: Border.all(color: listShadowColor),
+          ),
+          child: Row(
+            children: [
+              /// 🔹 АВАТАР
+              SmartAvatar(
+                src: member.img, // assets/...svg или url
+                size: 40,
               ),
-            );
-          }
 
-          final docs = snap.data?.docs ?? [];
-          if (docs.isEmpty) {
-            return const Center(
-              child: Text(
-                'Only you are in the group so far',
-                style: TextStyle(
-                  fontSize: fontSize16,
-                  color: textHintColor,
-                ),
-              ),
-            );
-          }
+              const SizedBox(width: width16),
 
-          final members = docs.map((d) {
-            final data = d.data();
-            return Member(
-              id: data['user_id'] as String? ?? d.id,
-              name: (data['name'] ?? 'User').toString(),
-              avatarUrl: data['avatar_url'] as String?,
-            );
-          }).toList();
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(padding16),
-            itemCount: members.length,
-            itemBuilder: (_, index) {
-              final member = members[index];
-              final isCurrentUser = member.id == widget.currentUserId;
-              final isMemberLeader = member.id == group.ownerId;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: height12),
-                padding: const EdgeInsets.all(padding12),
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(radius12),
-                  border: Border.all(
-                    color: listShadowColor,
-                    width: 1,
-                  ),
-                ),
-                child: Row(
+              /// 🔹 ИМЯ + РОЛЬ
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // avatar
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: backgroundMainColor,
-                      child: (member.avatarUrl != null &&
-                              member.avatarUrl!.isNotEmpty &&
-                              member.avatarUrl!.endsWith('.svg'))
-                          ? avatarSvg(member.avatarUrl!, size: 40)
-                          : const Icon(
-                              Icons.person,
-                              size: 24,
-                              color: textHintColor,
-                            ),
-                    ),
-                    const SizedBox(width: width16),
-
-                    // name + badges
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                member.name,
-                                style: const TextStyle(
-                                  fontSize: fontSize16,
-                                  fontWeight: FontWeight.w500,
-                                  color: textMainColor,
-                                ),
-                              ),
-                              if (isMemberLeader) ...[
-                                const SizedBox(width: width4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: padding6,
-                                    vertical: padding6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: buttonBackgroundColor,
-                                    borderRadius:
-                                        BorderRadius.circular(radius8),
-                                  ),
-                                  child: const Text(
-                                    'Leader',
-                                    style: TextStyle(
-                                      fontSize: fontSize12,
-                                      fontWeight: FontWeight.w500,
-                                      color: textMainColor,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
+                    Row(
+                      children: [
+                        Text(
+                          member.name,
+                          style: const TextStyle(
+                            fontSize: fontSize16,
+                            fontWeight: FontWeight.w500,
+                            color: textMainColor,
                           ),
-                          if (isCurrentUser)
-                            const Text(
-                              'You',
+                        ),
+                        if (isOwner) ...[
+                          const SizedBox(width: width8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: padding6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: buttonBackgroundColor,
+                              borderRadius: BorderRadius.circular(radius8),
+                            ),
+                            child: const Text(
+                              'Leader',
                               style: TextStyle(
                                 fontSize: fontSize12,
-                                color: textHintColor,
+                                color: textMainColor,
                               ),
                             ),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-
-                    // actions
-                    if (isLeader && !isMemberLeader)
-                      _circleIconButton(
-                        color: errorColor,
-                        icon: Icons.close,
-                        onPressed: () =>
-                            _removeMemberFromFirestore(group, member),
-                      )
-                    else if (isCurrentUser && !isMemberLeader)
-                      _circleIconButton(
-                        color: errorColor,
-                        icon: Icons.exit_to_app,
-                        onPressed: () => _leaveGroup(group),
+                    if (isCurrentUser)
+                      const Text(
+                        'You',
+                        style: TextStyle(
+                          fontSize: fontSize12,
+                          color: textHintColor,
+                        ),
                       ),
                   ],
                 ),
-              );
-            },
-          );
-        },
-      ),
+              ),
+
+              /// 🔹 КНОПКИ
+              if (isLeader && !isOwner)
+                IconButton(
+                  icon: const Icon(Icons.close, color: errorColor),
+                  onPressed: () {
+                    ref
+                        .read(groupsRepositoryProvider)
+                        .removeMemberFromGroup(group.id, member.userId);
+                  },
+                )
+              else if (isCurrentUser && !isOwner)
+                IconButton(
+                  icon: const Icon(Icons.exit_to_app, color: errorColor),
+                  onPressed: () {
+                    final uid = widget.currentUserId;
+                    if (uid == null) return;
+                    ref
+                        .read(groupsRepositoryProvider)
+                        .removeMemberFromGroup(group.id, uid);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  },
+),
     );
   }
 
@@ -231,27 +253,37 @@ class _GroupMembersPageState extends ConsumerState<GroupMembersPage> {
     );
   }
 
-  void _showAddMemberDialog(Group group) {
-    showDialog(
-      context: context,
-      builder: (_) => AddMemberDialog(
-        group: group,
-        onMemberAdded: (member) async {
-          final repo = ref.read(groupsRepositoryProvider);
-          await repo.addMemberToGroup(
+void _showAddMemberDialog(Group group) {
+  showDialog(
+    context: context,
+    builder: (_) => AddMemberDialog(
+      group: group,
+      onMemberAdded: (userId) async {
+        try {
+          await ref.read(groupsRepositoryProvider).addMemberToGroup(
             groupId: group.id,
-            userId: member.id,
-            name: member.name,
-            avatarUrl: member.avatarUrl,
+            userId: userId,
           );
-        },
-      ),
-    );
-  }
+
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Участник добавлен')),
+          );
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: $e')),
+          );
+        }
+      },
+    ),
+  );
+}
+
 
   Future<void> _removeMemberFromFirestore(Group group, Member member) async {
     final repo = ref.read(groupsRepositoryProvider);
-    await repo.removeMemberFromGroup(group.id, member.id);
+    await repo.removeMemberFromGroup(group.id, member.userId);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
