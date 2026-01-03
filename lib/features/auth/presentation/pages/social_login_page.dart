@@ -19,6 +19,27 @@ class SocialLoginPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AuthState>(authControllerProvider, (prev, next) {
+      final messenger = ScaffoldMessenger.of(context);
+      if (next.error != null && next.error != prev?.error) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(next.error!.message)),
+        );
+        return;
+      }
+
+      final completedAction = next.lastAction;
+      final finishedRequest =
+          (prev?.loading ?? false) && !next.loading && next.error == null;
+
+      if (finishedRequest && completedAction == AuthAction.googleSignIn) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/main',
+        );
+      }
+    });
+
     final authState = ref.watch(authControllerProvider);
 
     return Scaffold(
@@ -67,19 +88,7 @@ class SocialLoginPage extends ConsumerWidget {
                           : () async {
                               await ref
                                   .read(authControllerProvider.notifier)
-                                  .signInWithGoogle(context);
-
-                              if (!context.mounted) return;
-
-                              final state =
-                                  ref.read(authControllerProvider);
-                              if (state.error == null) {
-                                // если ошибки нет — идём на главный экран
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  '/main',
-                                );
-                              }
+                                  .signInWithGoogle();
                             },
                     ),
                     const SizedBox(height: height24),
@@ -108,7 +117,7 @@ class SocialLoginPage extends ConsumerWidget {
                     if (authState.error != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        authState.error!,
+                        authState.error!.message,
                         style: const TextStyle(
                           color: Colors.red,
                           fontSize: 12,

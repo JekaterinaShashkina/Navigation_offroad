@@ -28,10 +28,10 @@ extension GroupsRepositoryMembers on GroupsRepository {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      tx.update(groupRef, {
-        'member_ids': FieldValue.arrayUnion([userId]),
-        'updated_at': FieldValue.serverTimestamp(),
-      });
+      // tx.update(groupRef, {
+      //   'member_ids': FieldValue.arrayUnion([userId]),
+      //   'updated_at': FieldValue.serverTimestamp(),
+      // });
 
     });
   }
@@ -59,10 +59,10 @@ extension GroupsRepositoryMembers on GroupsRepository {
         if (!memberSnap.exists) return;
 
         tx.delete(memberRef);
-        tx.update(groupRef, {
-          'member_ids': FieldValue.arrayRemove([userId]),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
+        // tx.update(groupRef, {
+        //   'member_ids': FieldValue.arrayRemove([userId]),
+        //   'updated_at': FieldValue.serverTimestamp(),
+        // });
       });
     }
 

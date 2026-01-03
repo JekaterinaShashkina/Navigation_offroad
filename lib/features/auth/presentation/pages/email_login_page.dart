@@ -35,6 +35,13 @@ class _EmailLoginPageState extends ConsumerState<EmailLoginPage> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+
+
+  }
+
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -43,15 +50,7 @@ class _EmailLoginPageState extends ConsumerState<EmailLoginPage> {
 
     await ref
         .read(authControllerProvider.notifier)
-        .signInWithEmail(context, email, password);
-
-    // после попытки логина проверяем, не осталось ли ошибки
-    final state = ref.read(authControllerProvider);
-    if (!mounted) return;
-    if (state.error == null) {
-      // всё ок — идём на главный экран
-      Navigator.pushReplacementNamed(context, '/main');
-    }
+        .signInWithEmail(email, password);
   }
 
   Future<void> _resetPassword() async {
@@ -68,11 +67,43 @@ class _EmailLoginPageState extends ConsumerState<EmailLoginPage> {
 
     await ref
         .read(authControllerProvider.notifier)
-        .sendPasswordReset(context, email);
+        .sendPasswordReset(email);
   }
 
   @override
   Widget build(BuildContext context) {
+        ref.listen<AuthState>(authControllerProvider, (prev, next) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+
+      if (next.error != null && next.error != prev?.error) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(next.error!.message)),
+        );
+        return;
+      }
+
+      final completedAction = next.lastAction;
+      final finishedRequest =
+          (prev?.loading ?? false) && !next.loading && next.error == null;
+
+      if (!finishedRequest) return;
+
+      switch (completedAction) {
+        case AuthAction.emailSignIn:
+          Navigator.pushReplacementNamed(context, '/main');
+          break;
+        case AuthAction.resetPassword:
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Reset link sent to your email.'),
+            ),
+          );
+          break;
+        default:
+          break;
+      }
+    });
     final authState = ref.watch(authControllerProvider);
 
     return Scaffold(

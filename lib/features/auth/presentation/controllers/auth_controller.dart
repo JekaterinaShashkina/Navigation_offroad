@@ -1,32 +1,52 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:offroad_nav/core/failure.dart';
+import 'package:offroad_nav/core/result.dart';
+import 'package:offroad_nav/features/auth/domain/repositories/i_auth_repository.dart';
 
 import '../../data/services/phone_auth_service.dart';
 import '../../data/repositories/auth_repository.dart';
 
+enum AuthAction {
+  emailSignIn,
+  resetPassword,
+  phoneSignIn,
+  googleSignIn,
+  register;
+}
+
+
 class AuthState {
   final bool loading;
-  final String? error;
+  final Failure? error;
+  final AuthAction? lastAction;
+  static const _unset = Object();
 
-  const AuthState({
+  const AuthState( {
     this.loading = false,
-    this.error,
+    this.error, 
+    this.lastAction,
+
   });
 
   AuthState copyWith({
     bool? loading,
-    String? error,
+    Failure? error,
+    Object? lastAction = _unset,
   }) {
     return AuthState(
       loading: loading ?? this.loading,
       error: error,
+      lastAction: identical(lastAction, _unset)
+          ? this.lastAction
+          : lastAction as AuthAction?,
     );
   }
 }
 
 // репозиторий
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
+final authRepositoryProvider = Provider<IAuthRepository>((ref) {
   return AuthRepository();
 });
 
@@ -34,63 +54,54 @@ final authControllerProvider =
     NotifierProvider<AuthController, AuthState>(AuthController.new);
 
 class AuthController extends Notifier<AuthState> {
+  IAuthRepository get _repo => ref.read(authRepositoryProvider);
+
   @override
   AuthState build() => const AuthState();
 
+    Result<void> _toVoidResult<T>(Result<T> result) {
+    if (result.error != null) {
+      return Result.err(result.error!);
+    }
+    return Result.okVoid();
+  }
+
     // 📧 Логин по email/паролю
-  Future<void> signInWithEmail(
-    BuildContext context,
+  Future<Result<void>> signInWithEmail(
     String email,
     String password,
   ) async {
-    state = state.copyWith(loading: true, error: null);
+    state = state.copyWith(
+      loading: true,
+      error: null,
+      lastAction: AuthAction.emailSignIn,
+    );
 
-    try {
-      await ref.read(authRepositoryProvider).signInWithEmail(email, password);
-      state = state.copyWith(loading: false);
-      // успех, ошибки нет — навигацию оставим на странице
-    } on FirebaseAuthException catch (e) {
-      final code = e.code;
-      final msg = switch (code) {
-        'invalid-email' => 'Invalid email address.',
-        'user-not-found' => 'No user found for this email.',
-        'wrong-password' => 'Wrong password.',
-        'user-disabled' => 'This account is disabled.',
-        _ => e.message ?? 'Login failed. Try again.',
-      };
-
-      state = state.copyWith(loading: false, error: msg);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
-    } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login error: $e')),
-      );
-    }
+    final result = await _repo.signInWithEmail(email, password);
+    state = state.copyWith(
+      loading: false,
+      error: result.error,
+      lastAction: AuthAction.emailSignIn,
+    );
+    return _toVoidResult(result);
   }
 
   // 📧 Сброс пароля
-  Future<void> sendPasswordReset(
-    BuildContext context,
+  Future<Result<void>> sendPasswordReset(
     String email,
   ) async {
-    try {
-      await ref.read(authRepositoryProvider).sendPasswordReset(email);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reset link sent to your email.')),
-      );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Failed to send reset link')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send reset link: $e')),
-      );
-    }
+    state = state.copyWith(
+      loading: true,
+      error: null,
+      lastAction: AuthAction.resetPassword,
+    );
+    final result = await _repo.sendPasswordReset(email);
+    state = state.copyWith(
+      loading: false,
+      error: result.error,
+      lastAction: AuthAction.resetPassword,
+    );
+    return result;
   }
 
 
@@ -100,95 +111,74 @@ class AuthController extends Notifier<AuthState> {
     required String phoneE164,
   }) async {
     // включаем лоадер
-    state = state.copyWith(loading: true, error: null);
-
+        state = state.copyWith(
+      loading: true,
+      error: null,
+      lastAction: AuthAction.phoneSignIn,
+    );
     try {
       await PhoneAuthService.instance.startPhoneSignIn(
         context: context,
         phoneE164: phoneE164,
       );
       // если всё ок — просто убираем лоадер, ошибку не трогаем
-      state = state.copyWith(loading: false);
+      state = state.copyWith(
+        loading: false,
+        lastAction: AuthAction.phoneSignIn,
+      );
     } catch (e) {
       // если что-то сломалось — сохраняем текст ошибки
       state = state.copyWith(
         loading: false,
-        error: e.toString(),
-      );
-
-      // можно сразу показать SnackBar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Auth error: ${e.toString()}')),
+        error: AuthFailure(e.toString()),
+        lastAction: AuthAction.phoneSignIn,
       );
     }
   }
   /// 🟦 Google
-  Future<void>  signInWithGoogle(BuildContext context) async {
-    state = state.copyWith(loading: true, error: null);
-
-    try {
-      await ref.read(authRepositoryProvider).signInWithGoogle();
-      state = state.copyWith(loading: false);
-      // навигацию после успешного входа оставляем на странице
-    } on FirebaseAuthException catch (e) {
-      final msg = switch (e.code) {
-        'aborted-by-user' => 'Sign-in cancelled.',
-        'google-sign-in-failed' => 'Google sign-in failed.',
-        _ => e.message ?? 'Google sign-in error.',
-      };
-
-      state = state.copyWith(loading: false, error: msg);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
-    } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google login error: $e')),
-      );
-    }
+  Future<Result<void>> signInWithGoogle() async {
+    state = state.copyWith(
+      loading: true,       
+      error: null,
+      lastAction: AuthAction.googleSignIn,
+    );
+    final result = await _repo.signInWithGoogle();
+    state = state.copyWith(
+      loading: false,
+      error: result.error,
+      lastAction: AuthAction.googleSignIn,
+    );
+    return _toVoidResult(result);
   }
 
 // 🟣 Регистрация по email/паролю
-  Future<void> registerWithEmail(
+  Future<Result<void>> registerWithEmail(
     BuildContext context, {
     required String name,
     required String email,
     required String password,
   }) async {
-    state = state.copyWith(loading: true, error: null);
+    state = state.copyWith(
+      loading: true, 
+      error: null,
+      lastAction: AuthAction.register,
+    );
+    final result = await _repo.registerWithEmail(
+          name: name,
+          email: email,
+          password: password,
+        );
 
-    try {
-      await ref.read(authRepositoryProvider).registerWithEmail(
-            name: name,
-            email: email,
-            password: password,
-          );
-
-      state = state.copyWith(loading: false);
-      // навигацию будем делать в самой странице, если ошибки нет
-    } on FirebaseAuthException catch (e) {
-      final msg = switch (e.code) {
-        'email-already-in-use' => 'This email is already in use.',
-        'invalid-email' => 'Invalid email address.',
-        'weak-password' => 'Password is too weak.',
-        _ => e.message ?? 'Registration failed. Try again.',
-      };
-
-      state = state.copyWith(loading: false, error: msg);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
-    } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration error: $e')),
-      );
-    }
+    state = state.copyWith(
+      loading: false,
+      error: result.error,
+      lastAction: AuthAction.register,
+    );
+    return _toVoidResult(result);
   }
+
   /// 🚪 Выход (опционально, если где-то нужен)
-  Future<void> signOut() async {
-    await ref.read(authRepositoryProvider).signOut();
+  Future<Result<void>> signOut() async {
+    return _repo.signOut();
   }
 }

@@ -1,3 +1,4 @@
+import 'package:offroad_nav/core/result.dart';
 import 'package:offroad_nav/features/auth/domain/entities/auth_user.dart';
 
 abstract class IAuthRepository {
@@ -8,21 +9,21 @@ abstract class IAuthRepository {
   AuthUser? get currentUser;
 
   /// Логин по email/паролю
-  Future<AuthUser> signInWithEmail(String email, String password);
+  Future<Result<AuthUser>> signInWithEmail(String email, String password);
 
   /// Регистрация по email/паролю
-  Future<AuthUser> registerWithEmail({
+  Future<Result<AuthUser>> registerWithEmail({
     required String name,
     required String email,
     required String password,
   });
 
   /// Сброс пароля
-  Future<void> sendPasswordReset(String email);
+  Future<Result<void>> sendPasswordReset(String email);
 
   /// Логин через Google
-  Future<AuthUser> signInWithGoogle();
+  Future<Result<AuthUser>> signInWithGoogle();
 
   /// Выход
-  Future<void> signOut();
+  Future<Result<void>> signOut();
 }

@@ -1,4 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:offroad_nav/core/failure.dart';
+import 'package:offroad_nav/core/result.dart';
 import 'package:offroad_nav/features/auth/domain/entities/auth_user.dart';
 import 'package:offroad_nav/features/auth/domain/repositories/i_auth_repository.dart';
 
@@ -28,43 +30,57 @@ class AuthRepository implements IAuthRepository {
   AuthUser? get currentUser => _mapUser(_auth.currentUser);
 
   // 📧 Логин по email/паролю
-  Future<AuthUser> signInWithEmail(
+  @override
+  Future<Result<AuthUser>> signInWithEmail(
     String email,
     String password,
   ) async {
-    final cred = await _auth.signInWithEmailAndPassword(
+    try {
+          final cred = await _auth.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
         final user = cred.user;
-
-    if (user != null) {
+            if (user != null) {
       await UserRepository.upsertOnLogin(user);
     }
-
-    return _mapUser(user)!;
+    return Result.ok(_mapUser(user)!);
+    } on FirebaseAuthException catch (e) {
+      return Result.err(_mapFirebaseException(e));
+    } on Failure catch (f) {
+      return Result.err(f);
+    } catch (e) {
+      return Result.err(AuthFailure(e.toString()));
+    }
   }
 
   // 📧 Сброс пароля
   @override
-  Future<void> sendPasswordReset(String email) {
-    return _auth.sendPasswordResetEmail(email: email);
+  Future<Result<void>> sendPasswordReset(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return Result.okVoid();
+    } on FirebaseAuthException catch (e) {
+      return Result.err(_mapFirebaseException(e));
+    } catch (e) {
+      return Result.err(AuthFailure(e.toString()));
+    }
   }
 
 
   // 🟦 Регистрация по email/паролю
   @override
-  Future<AuthUser> registerWithEmail({
+  Future<Result<AuthUser>> registerWithEmail({
     required String name,
     required String email,
     required String password,
   }) async {
-    final cred = await _auth.createUserWithEmailAndPassword(
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
-
-    final user = cred.user;
+        final user = cred.user;
     if (user != null) {
       // обновим отображаемое имя в Firebase Auth
       await user.updateDisplayName(name);
@@ -79,20 +95,57 @@ class AuthRepository implements IAuthRepository {
         },
       );
     }
-
-    return _mapUser(cred.user)!;
+          return Result.ok(_mapUser(cred.user)!);
+    } on FirebaseAuthException catch (e) {
+      return Result.err(_mapFirebaseException(e));
+    } on Failure catch (f) {
+      return Result.err(f);
+    } catch (e) {
+      return Result.err(AuthFailure(e.toString()));
+    }
   }
   
     // 🟦 Логин через Google (через твой GoogleAuthService)
   @override
-  Future<AuthUser> signInWithGoogle() async{
-    final cred = await GoogleAuthService.instance.signInWithGoogle();
+  Future<Result<AuthUser>> signInWithGoogle() async {
+    try {
+          final cred = await GoogleAuthService.instance.signInWithGoogle();
     final user = cred.user;
-    return _mapUser(user)!;
+    return Result.ok(_mapUser(user)!);
+    } on FirebaseAuthException catch (e) {
+      return Result.err(_mapFirebaseException(e));
+    } on Failure catch (f) {
+      return Result.err(f);
+    } catch (e) {
+      return Result.err(AuthFailure(e.toString()));
+    }
   }
 
   // 🚪 Выход (через GoogleAuthService, он же дергает _auth.signOut)
-  Future<void> signOut() async {
-    await GoogleAuthService.instance.signOut();
+  Future<Result<void>> signOut() async{
+    try {
+          await GoogleAuthService.instance.signOut();
+          return Result.okVoid();
+    } on FirebaseAuthException catch (e) {
+      return Result.err(_mapFirebaseException(e));
+    } catch (e) {
+      return Result.err(AuthFailure(e.toString()));
+    }
+  }
+
+  AuthFailure _mapFirebaseException(FirebaseAuthException e) {
+    final msg = switch (e.code) {
+      'invalid-email' => 'Invalid email address.',
+      'user-not-found' => 'No user found for this email.',
+      'wrong-password' => 'Wrong password.',
+      'user-disabled' => 'This account is disabled.',
+      'email-already-in-use' => 'This email is already in use.',
+      'weak-password' => 'Password is too weak.',
+      'aborted-by-user' => 'Sign-in cancelled.',
+      'google-sign-in-failed' => 'Google sign-in failed.',
+      _ => e.message ?? 'Authentication error. Try again.',
+    };
+
+    return AuthFailure(msg);
   }
 }

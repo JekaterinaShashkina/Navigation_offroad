@@ -66,6 +66,15 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
   @override
   Widget build(BuildContext context) {
+        ref.listen<AuthState>(authControllerProvider, (prev, next) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      if (next.error != null && next.error != prev?.error) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(next.error!.message)),
+        );
+      }
+    });
     final authState = ref.watch(authControllerProvider);
 
     return Scaffold(
@@ -146,7 +155,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   if (authState.error != null) ...[
                     const SizedBox(height: 8),
                     Text(
-                      authState.error!,
+                      authState.error!.message,
                       style: const TextStyle(color: Colors.red, fontSize: 12),
                     ),
                   ],
