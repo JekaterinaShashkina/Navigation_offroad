@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
   import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
 
   import 'package:offroad_nav/features/groups/domain/entities/group.dart';
-  import 'package:offroad_nav/features/groups/domain/entities/member.dart';
   import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
 
   class AddMemberDialog extends StatefulWidget {

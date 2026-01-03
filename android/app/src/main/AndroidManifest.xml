@@ -1,16 +1,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Android 10+ (API 29+) для "Always" -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Foreground service (нужно для фоновой геолокации на новых Android) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
         android:label="offroad_nav"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!-- The meta-data tag below is used to specify the Google Maps API key.
-             Replace --> 
+        Replace --> 
         <meta-data android:name="com.google.android.geo.API_KEY"
                 android:value="AIzaSyBmoEPfvez7-e6S0npZc5xPNvXrkSFsfqY"/>
 

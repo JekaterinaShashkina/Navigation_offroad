@@ -175,9 +175,14 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
                             label: _ctrl.isRecording ? 'Pause' : 'Go',
                             iconWidget:
                                 _ctrl.isRecording ? pauseIconNavigation : goIconNavigation,
-                            onTap: () => _ctrl.isRecording
-                                ? _ctrl.pauseRecording()
-                                : _ctrl.startRecording(),
+                            onTap: () async {
+                              debugPrint('🔥🔥🔥 GO BUTTON TAP (UI)');
+                              if (_ctrl.isRecording) {
+                                await _ctrl.pauseRecording();
+                              } else {
+                                await _ctrl.startRecording();
+                              }
+                            },
                             enabled: true,
                             filled: _ctrl.isRecording,
                           ),

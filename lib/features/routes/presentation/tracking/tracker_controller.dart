@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:offroad_nav/features/routes/presentation/utils/location_permissions.dart';
 import 'package:offroad_nav/features/routes/presentation/utils/route_math.dart';
 
 /// Контроллер трекинга: выдаёт текущую позицию, сглаженный курс маркера,
@@ -62,13 +63,8 @@ double get speedKmh => _lastSpeedMps * 3.6;
     });
 
     // разрешения локации
-    bool s = await _loc.serviceEnabled();
-    if (!s) s = await _loc.requestService();
-    var p = await _loc.hasPermission();
-    if (p == PermissionStatus.denied) {
-      p = await _loc.requestPermission();
-    }
-    if (p != PermissionStatus.granted) return;
+  final ok = await ensureLocationPermissions(_loc);
+  if (!ok) return;
 
     // точные апдейты
     await _loc.changeSettings(
@@ -90,34 +86,59 @@ double get speedKmh => _lastSpeedMps * 3.6;
     notifyListeners();
   }
 
-  void dispose() {
-    _locSub?.cancel();
-    _compassSub?.cancel();
-    super.dispose();
-  }
+@override
+void dispose() {
+  _loc.enableBackgroundMode(enable: false).catchError((_) {});
+  _locSub?.cancel();
+  _compassSub?.cancel();
+  super.dispose();
+}
 
   // запись
-  void startRecording() {
-    if (_isRecording) return;
-    _isRecording = true;
-    notifyListeners();
+Future<void> startRecording() async {
+if (_isRecording) return;
+debugPrint('OFFROAD 🔥🔥🔥startRecording pressed, isRecording=$_isRecording');
+  // 1) СРАЗУ включаем запись (UI не должен ждать)
+  _isRecording = true;
+  notifyListeners();
+  // 2) Дальше — фон (не должен ломать старт)
+  try {
+    final ok = await ensureLocationPermissions(_loc);
+    if (!ok) {
+      _isRecording = false;
+      notifyListeners();
+      return;
+    }
+    // await _loc.enableBackgroundMode(enable: true);
+  } catch (e) {
+    // если фон не включился — запись всё равно может работать на экране
+    debugPrint('enableBackgroundMode failed: $e');
   }
+}
 
-  void pauseRecording() {
-    if (!_isRecording) return;
-    _isRecording = false;
-    notifyListeners();
-  }
+Future<void> pauseRecording() async {
+  if (!_isRecording) return;
+  debugPrint('pauseRecording pressed, isRecording=$_isRecording');
+  _isRecording = false;
 
-  void clearTrack() {
-    _isRecording = false;
-    track.clear();
-    notifyListeners();
-  }
+  await _loc.enableBackgroundMode(enable: false);
+
+  notifyListeners();
+}
+
+Future<void> clearTrack() async {
+  _isRecording = false;
+  track.clear();
+
+  await _loc.enableBackgroundMode(enable: false);
+
+  notifyListeners();
+}
 
   // ----- обработка локации -----
 
   void _onLocation(LocationData l) {
+    debugPrint('OFFROAD 🟢🟢🟢 onLocation tick lat=${l.latitude} lng=${l.longitude} acc=${l.accuracy}');
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastUpdateMs < _MIN_UPDATE_MS) return;
     _lastUpdateMs = now;
@@ -134,7 +155,7 @@ double get speedKmh => _lastSpeedMps * 3.6;
     if (_lastAcceptedPos != null && distanceM(_lastAcceptedPos!, pos) > _MAX_JUMP_M) {
       return;
     }
-
+    final prev = _lastAcceptedPos;
     // --- курс ---
     final speed = (l.speed ?? 0).toDouble(); // м/с
     _lastSpeedMps = speed;                   // 🔽 запоминаем скорость
@@ -144,8 +165,8 @@ double get speedKmh => _lastSpeedMps * 3.6;
     if (speed > _MOVE_SPEED_MPS) {
       if (locHeading != null && locHeading >= 0) {
         targetDeg = locHeading;          // идеал в движении
-      } else if (_lastAcceptedPos != null) {
-        targetDeg = bearingDeg(_lastAcceptedPos!, pos);
+      } else if (prev != null) {
+        targetDeg = bearingDeg(prev, pos);
       }
     }
 
@@ -156,14 +177,14 @@ double get speedKmh => _lastSpeedMps * 3.6;
     _markerRot = lerpAngle(_markerRot, targetDeg, _TURN_ALPHA);
 
     // --- позиция ---
-    _lastAcceptedPos = _currentPos;
+    _lastAcceptedPos = pos;
     _currentPos = pos;
 
     // запись трека — не чаще, чем каждые ~3м
     if (_isRecording) {
-      if (track.isEmpty || distanceM(track.last, pos) > 3) {
-        track.add(pos);
-      }
+  final shouldAdd = track.isEmpty || distanceM(track.last, pos) > 3;
+  debugPrint('OFFROAD 🔥REC isRecording=$_isRecording trackLen=${track.length} shouldAdd=$shouldAdd');
+  if (shouldAdd) track.add(pos);
     }
 
     notifyListeners();

@@ -1,79 +1,82 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_svg/flutter_svg.dart' as svg;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:vector_graphics/vector_graphics.dart';
 
-/// Делает круглые маркеры-аватары для GoogleMap и кеширует их.
-/// Использование:
-///   final icon = await AvatarMarkerFactory.I.get(userId: uid, photoUrl: url);
-class AvatarMarkerFactory {
+class   AvatarMarkerFactory {
   AvatarMarkerFactory._();
-
   static final AvatarMarkerFactory I = AvatarMarkerFactory._();
 
   final Map<String, BitmapDescriptor> _cache = {};
   final Map<String, Future<BitmapDescriptor>> _inFlight = {};
 
-  /// Можно сделать несколько размеров (напр. 96/128/160) по кейсам
   static const int defaultSize = 140;
 
   BitmapDescriptor get defaultIcon => BitmapDescriptor.defaultMarker;
 
-  void clear() => _cache.clear();
-
-  /// Получить BitmapDescriptor для аватара (круглый + белая рамка).
-  /// Кэшируется по ключу: "$userId|$photoUrl|$size"
   Future<BitmapDescriptor> get({
     required String userId,
-    required String? photoUrl,
+    required String? photoUrlOrAsset, // может быть url или assets/...
     int size = defaultSize,
   }) {
-    if (photoUrl == null || photoUrl.isEmpty) {
-      return Future.value(defaultIcon);
-    }
+    final src = photoUrlOrAsset;
+    if (src == null || src.isEmpty) return Future.value(defaultIcon);
 
-    final key = '$userId|$photoUrl|$size';
-
+    final key = '$userId|$src|$size';
     final cached = _cache[key];
     if (cached != null) return Future.value(cached);
 
     final inflight = _inFlight[key];
     if (inflight != null) return inflight;
 
-    final fut = _build(photoUrl, size).then((icon) {
+    final fut = _build(src, size).then((icon) {
       _cache[key] = icon;
       _inFlight.remove(key);
+
       return icon;
-    }).catchError((_) {
+    }).catchError((e, st) {
       _inFlight.remove(key);
+        debugPrint('❌ avatar build failed: user=$userId src=$src size=$size err=$e');
+  debugPrintStack(stackTrace: st);
       return defaultIcon;
     });
-
+    debugPrint('✅ avatar ready for user=$userId}');
     _inFlight[key] = fut;
     return fut;
   }
 
-  Future<BitmapDescriptor> _build(String url, int size) async {
-    final png = await _circlePngFromUrl(url, size: size);
-    return BitmapDescriptor.fromBytes(png);
+  Future<BitmapDescriptor> _build(String src, int size) async {
+    final png = await _circlePngFromSource(src, size: size);
+    return BitmapDescriptor.bytes(png);
   }
 
-  Future<Uint8List> _circlePngFromUrl(String url, {required int size}) async {
-    final resp = await http.get(Uri.parse(url));
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('HTTP ${resp.statusCode}');
+  Future<Uint8List> _circlePngFromSource(String src, {required int size}) async {
+    // 1) получить bytes (растр) или svg-string
+    final bool isAsset = src.startsWith('assets/');
+    final bool isSvg = src.toLowerCase().endsWith('.svg');
+
+    ui.Image img;
+
+    if (isSvg) {
+      final String svgText = isAsset
+          ? await rootBundle.loadString(src)
+          : await _downloadText(src);
+
+      img = await _renderSvgToImage(svgText, size: size);
+    } else {
+      final Uint8List bytes = isAsset
+          ? (await rootBundle.load(src)).buffer.asUint8List()
+          : await _downloadBytes(src);
+
+      img = await _decodeRasterToImage(bytes, size: size);
     }
-    final bytes = resp.bodyBytes;
 
-    final codec = await ui.instantiateImageCodec(
-      bytes,
-      targetWidth: size,
-      targetHeight: size,
-    );
-    final frame = await codec.getNextFrame();
-    final img = frame.image;
-
+    // 2) сделать круг + рамку
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
     final paint = ui.Paint()..isAntiAlias = true;
@@ -87,7 +90,6 @@ class AvatarMarkerFactory {
       paint,
     );
 
-    // белая обводка
     final border = ui.Paint()
       ..style = ui.PaintingStyle.stroke
       ..strokeWidth = 6
@@ -100,4 +102,43 @@ class AvatarMarkerFactory {
     final pngBytes = await outImg.toByteData(format: ui.ImageByteFormat.png);
     return pngBytes!.buffer.asUint8List();
   }
+
+  Future<ui.Image> _decodeRasterToImage(Uint8List bytes, {required int size}) async {
+    final codec = await ui.instantiateImageCodec(
+      bytes,
+      targetWidth: size,
+      targetHeight: size,
+    );
+    final frame = await codec.getNextFrame();
+    return frame.image;
+  }
+
+  Future<Uint8List> _downloadBytes(String url) async {
+    final resp = await http.get(Uri.parse(url));
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception('HTTP ${resp.statusCode}');
+    }
+    return resp.bodyBytes;
+  }
+
+  Future<String> _downloadText(String url) async {
+    final resp = await http.get(Uri.parse(url));
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception('HTTP ${resp.statusCode}');
+    }
+    return resp.body;
+  }
+
+Future<ui.Image> _renderSvgToImage(String svgText, {required int size}) async {
+  final pictureInfo = await vg.loadPicture(
+    svg.SvgStringLoader(svgText),
+    null,
+  );
+
+  final picture = pictureInfo.picture;
+  final img = await picture.toImage(size, size);
+
+  picture.dispose(); // ✅ один dispose
+  return img;
+}
 }

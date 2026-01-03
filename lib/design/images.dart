@@ -264,8 +264,6 @@ SvgPicture buildColoredIcon(String assetPath, bool isSelected) {
   );
 }
 
-
-
 // Аватар мальчики
 final SvgPicture avatarBoy01 = SvgPicture.asset(
   'assets/images/avatar_boy_01.svg',
