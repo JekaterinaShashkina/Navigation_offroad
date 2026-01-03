@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+import 'package:offroad_nav/features/routes/presentation/utils/route_math.dart';
 
 class LiveUserRtdb {
   final String userId;
@@ -32,8 +35,20 @@ class LiveUserRtdb {
   }
 }
 
+class _SmoothState {
+  double lat;
+  double lng;
+  int lastEmitMs;
+  _SmoothState(this.lat, this.lng, this.lastEmitMs);
+}
+
 class GroupsLiveRepository {
   final FirebaseDatabase _rtdb;
+  final Map<String, _SmoothState> _smooth = {};
+  static const int _minEmitMs = 300;
+  static const double _minMoveM = 4.0;
+  static const double _alpha = 0.2;
+
   GroupsLiveRepository(this._rtdb);
 
   DatabaseReference _liveRef(String groupId) =>
@@ -46,24 +61,96 @@ class GroupsLiveRepository {
   Stream<List<LiveUserRtdb>> watchLiveUsers(String groupId) {
     final ref = _liveRef(groupId);
 
-    return ref.onValue.map((event) {
-      final val = event.snapshot.value;
-      if (val == null) return <LiveUserRtdb>[];
+  return ref.onValue.map((event) {
+    final val = event.snapshot.value;
+    if (val == null) return <LiveUserRtdb>[];
 
-      final map = val as Map<dynamic, dynamic>;
-      final res = <LiveUserRtdb>[];
+    final map = val as Map<dynamic, dynamic>;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-      map.forEach((k, v) {
-        if (v is Map<dynamic, dynamic>) {
-          try {
-            res.add(LiveUserRtdb.fromMap(k.toString(), v));
-          } catch (_) {}
-        }
-      });
+    final res = <LiveUserRtdb>[];
 
-      return res;
+    map.forEach((k, v) {
+      if (v is! Map<dynamic, dynamic>) return;
+
+      final uid = k.toString();
+      LiveUserRtdb raw;
+      try {
+        raw = LiveUserRtdb.fromMap(uid, v);
+      } catch (_) {
+        return;
+      }
+
+      final st = _smooth[uid];
+
+      // первый раз — без сглаживания
+      if (st == null) {
+        _smooth[uid] = _SmoothState(raw.lat, raw.lng, nowMs);
+        res.add(raw);
+        return;
+      }
+
+      // 1) throttle: не чаще чем раз в 300ms на юзера
+      if (nowMs - st.lastEmitMs < _minEmitMs) {
+        // возвращаем последнее сглаженное значение
+        res.add(
+          LiveUserRtdb(
+            userId: raw.userId,
+            lat: st.lat,
+            lng: st.lng,
+            heading: raw.heading,
+            speed: raw.speed,
+            updatedAtMs: raw.updatedAtMs,
+          ),
+        );
+        return;
+      }
+
+      // 2) min move filter (метры)
+      final movedM = distanceM(
+        LatLng(st.lat, st.lng),
+        LatLng(raw.lat, raw.lng),
+      );
+      if (movedM < _minMoveM) {
+        st.lastEmitMs = nowMs;
+        res.add(
+          LiveUserRtdb(
+            userId: raw.userId,
+            lat: st.lat,
+            lng: st.lng,
+            heading: raw.heading,
+            speed: raw.speed,
+            updatedAtMs: raw.updatedAtMs,
+          ),
+        );
+        return;
+      }
+
+      // 3) EMA smoothing
+      st.lat = st.lat + _alpha * (raw.lat - st.lat);
+      st.lng = st.lng + _alpha * (raw.lng - st.lng);
+      st.lastEmitMs = nowMs;
+
+      res.add(
+        LiveUserRtdb(
+          userId: raw.userId,
+          lat: st.lat,
+          lng: st.lng,
+          heading: raw.heading,
+          speed: raw.speed,
+          updatedAtMs: raw.updatedAtMs,
+        ),
+      );
     });
+
+    // если кто-то исчез из RTDB — чистим его из кэша
+    final currentIds = map.keys.map((e) => e.toString()).toSet();
+    _smooth.removeWhere((uid, _) => !currentIds.contains(uid));
+
+    return res;
+  });
   }
+  
 
   /// апдейт своей позиции
   Future<void> upsertMyLiveLocation({
@@ -76,10 +163,6 @@ class GroupsLiveRepository {
   }) async {
     final ref = _meRef(groupId, userId);
 
-    // полезно: если приложение умерло/сеть пропала — удалим запись
-    // (работает когда есть соединение; иначе удалится при переподключении)
-    await ref.onDisconnect().remove();
-
     await ref.set({
       'lat': lat,
       'lng': lng,
@@ -88,6 +171,13 @@ class GroupsLiveRepository {
       'updatedAt': ServerValue.timestamp,
     });
   }
+
+  Future<void> startSharing({
+  required String groupId,
+  required String userId,
+}) async {
+  await _meRef(groupId, userId).onDisconnect().remove();
+}
 
   /// остановить шаринг
   Future<void> stopSharing({

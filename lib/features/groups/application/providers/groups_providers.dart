@@ -105,20 +105,17 @@ final liveUsersWithProfilesProvider =
   final liveRepo = ref.watch(groupsLiveRepositoryProvider);
   final db = FirebaseFirestore.instance;
 
-  await for (final live in liveRepo.watchLiveUsers(groupId)) {
-    if (live.isEmpty) {
-      yield <LiveUserView>[];
-      continue;
-    }
+  // ✅ кеш профилей: userId -> data
+  final profiles = <String, Map<String, dynamic>>{};
 
-    final ids = live.map((u) => u.userId).toSet().toList();
+  // ✅ чтобы не гонять одни и те же запросы параллельно
+  Future<void> fetchMissingProfiles(Set<String> ids) async {
+    final missing = ids.where((id) => !profiles.containsKey(id)).toList();
+    if (missing.isEmpty) return;
 
-    // whereIn лимит 10 -> chunks
     const chunkSize = 10;
-    final profiles = <String, Map<String, dynamic>>{};
-
-    for (var i = 0; i < ids.length; i += chunkSize) {
-      final chunk = ids.sublist(i, (i + chunkSize > ids.length) ? ids.length : i + chunkSize);
+    for (var i = 0; i < missing.length; i += chunkSize) {
+      final chunk = missing.sublist(i, (i + chunkSize > missing.length) ? missing.length : i + chunkSize);
 
       final snap = await db
           .collection('users')
@@ -128,9 +125,29 @@ final liveUsersWithProfilesProvider =
       for (final doc in snap.docs) {
         profiles[doc.id] = doc.data();
       }
+
+      // ✅ если кого-то нет в Firestore, тоже отметим чтобы не пытаться снова
+      for (final id in chunk) {
+        profiles.putIfAbsent(id, () => <String, dynamic>{});
+      }
+    }
+  }
+
+  await for (final live in liveRepo.watchLiveUsers(groupId)) {
+    if (live.isEmpty) {
+      yield <LiveUserView>[];
+      continue;
     }
 
-    yield live.map((u) {
+    final ids = live.map((u) => u.userId).toSet();
+
+    // ✅ подгружаем только тех, кого ещё нет в кеше
+    await fetchMissingProfiles(ids);
+
+    final liveSorted = [...live]..sort((a, b) => a.userId.compareTo(b.userId));
+
+    // ✅ собираем view без сетевых запросов
+    yield liveSorted.map((u) {
       final p = profiles[u.userId];
       return LiveUserView(
         userId: u.userId,
@@ -143,6 +160,7 @@ final liveUsersWithProfilesProvider =
     }).toList();
   }
 });
+
 
 final groupOwnerIdProvider =
     StreamProvider.autoDispose.family<String?, String>((ref, groupId) {

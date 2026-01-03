@@ -207,19 +207,16 @@ Future<void> _loadIcons() async {
     return index;
   }
 
-  void _warmUpAvatars(List<LiveUserView> users) async {
+void _warmUpAvatars(List<LiveUserView> users) async {
 bool changed = false;
-
     for (final u in users) {
       if (_avatarIcons.containsKey(u.userId)) continue;
-
       try {
         final icon = await AvatarMarkerFactory.I.get(
           userId: u.userId,
           photoUrlOrAsset: u.img,
-          size: 48,
+          size: 240,
         );
-
         _avatarIcons[u.userId] = icon;
         changed = true;
         debugPrint('✅ avatar ready for ${u.name}');
@@ -227,7 +224,6 @@ bool changed = false;
         debugPrint('❌ avatar failed for ${u.name}: $e');
       }
     }
-
     if (changed && mounted) {
       setState(() {});
     }

@@ -18,6 +18,7 @@ class LiveTrackingSource implements ITrackingSource {
   final Location _loc;
   final double accMaxM;
   final double maxJumpM;
+  
 
   final LatLng? startPoint;
   final double requireStartWithinM;
@@ -54,7 +55,7 @@ class LiveTrackingSource implements ITrackingSource {
     await _loc.changeSettings(
       accuracy: LocationAccuracy.high,
       interval: 1000,
-      distanceFilter: 2,
+      distanceFilter: 6,
     );
 
         // опционально: проверим текущую позицию один раз до подписки

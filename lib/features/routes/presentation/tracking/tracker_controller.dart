@@ -70,7 +70,7 @@ double get speedKmh => _lastSpeedMps * 3.6;
     await _loc.changeSettings(
       accuracy: LocationAccuracy.navigation,
       interval: 1000,
-      distanceFilter: 2,
+      distanceFilter: 6,
     );
 
     // текущая позиция (один раз, чтобы камера могла стартануть)
