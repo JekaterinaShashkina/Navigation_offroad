@@ -79,9 +79,9 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
 
   double get _activeBearing => _followLeader ? (_leaderHeading ?? _bearing) : _bearing;
 
-  LatLng? _lastCameraTarget;
-  double? _lastCameraBearing;
-  DateTime? _lastCameraMoveAt;
+  // LatLng? _lastCameraTarget;
+  // double? _lastCameraBearing;
+  // DateTime? _lastCameraMoveAt;
 
   bool get _showStartBanner =>
       widget.mode == TrackingMode.live &&
@@ -170,58 +170,70 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
   }
 
   void _listenLeaderLive() {
-      final gid = widget.groupId;
-      if (gid == null) return;
+    final gid = widget.groupId;
+    if (gid == null) return;
 
-      _ownerSubscription = ref.listen<AsyncValue<String?>>(
-        groupOwnerIdProvider(gid),
-        (previous, next) {
-          next.whenData((ownerId) {
-            if (!mounted) return;
-            setState(() => _leaderId = ownerId);
-          });
-        },
-        fireImmediately: true,
-      );
-
-      _liveSubscription = ref.listen<AsyncValue<List<LiveUserView>>>(
-        liveUsersWithProfilesProvider(gid),
-        (previous, next) {
-          next.whenData((users) {
-            final leaderId = _leaderId;
-            if (leaderId == null) return;
-
-            LiveUserView? leader;
-            for (final u in users) {
-              if (u.userId == leaderId) {
-                leader = u;
-                break;
-              }
-            }
-
-            if (!mounted) return;
-            setState(() {
-              if (leader != null) {
-                _leaderPosition = LatLng(leader.lat, leader.lng);
-                _leaderHeading = leader.heading;
-              } else {
-                _leaderPosition = null;
-                _leaderHeading = null;
-              }
-            });
-
-            if (_followLeader && _leaderPosition != null) {
-              _updateCameraPosition(
-                target: _leaderPosition,
-                bearing: _leaderHeading,
-              );
-              _updateRouteProgress(_leaderPosition!);
-            }
-          });
-        },
-        fireImmediately: true,
-      );
+    // начальное значение владельца
+    final ownerInitial = ref.read(groupOwnerIdProvider(gid)).value;
+    if (ownerInitial != null) {
+      _leaderId = ownerInitial;
     }
+
+    ref.listen<AsyncValue<String?>>(
+      groupOwnerIdProvider(gid),
+      (previous, next) {
+        next.whenData((ownerId) {
+          if (!mounted) return;
+          setState(() => _leaderId = ownerId);
+        });
+      },
+    );
+
+    // подхватим уже имеющиеся live данные, если они прогружены
+    _applyLeaderFromUsers(ref.read(liveUsersWithProfilesProvider(gid)).value);
+
+    ref.listen<AsyncValue<List<LiveUserView>>>(
+      liveUsersWithProfilesProvider(gid),
+      (previous, next) {
+        next.whenData((users) {
+          _applyLeaderFromUsers(users);
+
+          if (_followLeader && _leaderPosition != null) {
+            _updateCameraPosition(
+              target: _leaderPosition,
+              bearing: _leaderHeading,
+            );
+            _updateRouteProgress(_leaderPosition!);
+          }
+        });
+      },
+    );
+  }
+ void _applyLeaderFromUsers(List<LiveUserView>? users) {
+    if (users == null) return;
+
+    final leaderId = _leaderId;
+    if (leaderId == null) return;
+
+    LiveUserView? leader;
+    for (final u in users) {
+      if (u.userId == leaderId) {
+        leader = u;
+        break;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      if (leader != null) {
+        _leaderPosition = LatLng(leader.lat, leader.lng);
+        _leaderHeading = leader.heading;
+      } else {
+        _leaderPosition = null;
+        _leaderHeading = null;
+      }
+    });
+  }
 
   void _updateCameraPosition({LatLng? target, double? bearing}) {
     final pos = target ?? _activePosition;
