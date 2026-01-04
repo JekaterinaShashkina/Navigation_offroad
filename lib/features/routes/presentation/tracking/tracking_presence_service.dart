@@ -12,12 +12,14 @@ class TrackingPresenceService {
     required String? groupId,
     required String? uid,
     required double bearing,
+    double? accuracyM,
   }) async {
     // 1) users/location (твоя текущая логика)
     await RouteTrackingRepository.instance.sendLocation(
       lat: pos.latitude,
       lng: pos.longitude,
       groupId: groupId,
+      accuracyM: accuracyM,
     );
 
     // 2) groups_live (только если группа)
@@ -30,6 +32,7 @@ class TrackingPresenceService {
       lat: pos.latitude,
       lng: pos.longitude,
       heading: bearing,
+      accuracyM: accuracyM,
     );
   }
 

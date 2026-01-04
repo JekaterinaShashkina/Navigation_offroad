@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../design/images.dart';
 import '../tracking/tracker_controller.dart';
@@ -32,6 +33,7 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     _loadCustomMarker();
     _ctrl.start();
   }
@@ -50,6 +52,7 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
   @override
   void dispose() {
     _ctrl.dispose();
+    WakelockPlus.disable();
     super.dispose();
   }
 

@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:offroad_nav/features/groups/data/repositories/groups_repository.dart';
 import 'package:offroad_nav/features/groups/data/repositories/groups_live_repository.dart';
 import 'package:offroad_nav/features/groups/domain/entities/group.dart';
 import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
+import 'package:offroad_nav/features/routes/presentation/utils/route_math.dart';
 import 'package:rxdart/rxdart.dart';
 
 // репозиторий — один на всё приложение.
@@ -106,7 +110,15 @@ final liveUsersWithProfilesProvider =
   final db = FirebaseFirestore.instance;
 
   // ✅ кеш профилей: userId -> data
+    const minAnimMs = 220;
+  const maxAnimMs = 1200;
+  const frameIntervalMs = 16;
+  const maxJumpM = 40.0;
+  const maxAccuracyM = 45.0;
   final profiles = <String, Map<String, dynamic>>{};
+    final motions = <String, _LiveUserMotionState>{};
+  final controller = StreamController<List<LiveUserView>>();
+  var disposed = false;
 
   // ✅ чтобы не гонять одни и те же запросы параллельно
   Future<void> fetchMissingProfiles(Set<String> ids) async {
@@ -117,10 +129,7 @@ final liveUsersWithProfilesProvider =
     for (var i = 0; i < missing.length; i += chunkSize) {
       final chunk = missing.sublist(i, (i + chunkSize > missing.length) ? missing.length : i + chunkSize);
 
-      final snap = await db
-          .collection('users')
-          .where(FieldPath.documentId, whereIn: chunk)
-          .get();
+      final snap = await db.collection('users').where(FieldPath.documentId, whereIn: chunk).get();  
 
       for (final doc in snap.docs) {
         profiles[doc.id] = doc.data();
@@ -133,32 +142,109 @@ final liveUsersWithProfilesProvider =
     }
   }
 
-  await for (final live in liveRepo.watchLiveUsers(groupId)) {
-    if (live.isEmpty) {
-      yield <LiveUserView>[];
-      continue;
-    }
+  // await for (final live in liveRepo.watchLiveUsers(groupId)) {
+  //   if (live.isEmpty) {
+  //     yield <LiveUserView>[];
+  //     continue;
+  //   }
 
-    final ids = live.map((u) => u.userId).toSet();
+  //   final ids = live.map((u) => u.userId).toSet();
+
+    List<LiveUserView> buildFrame(int nowMs) {
+    final views = motions.entries.map((entry) {
+      final state = entry.value;
+      final pos = state.positionAt(nowMs);
+      final p = profiles[entry.key];
 
     // ✅ подгружаем только тех, кого ещё нет в кеше
-    await fetchMissingProfiles(ids);
+    // await fetchMissingProfiles(ids);
 
-    final liveSorted = [...live]..sort((a, b) => a.userId.compareTo(b.userId));
+    // final liveSorted = [...live]..sort((a, b) => a.userId.compareTo(b.userId));
 
-    // ✅ собираем view без сетевых запросов
-    yield liveSorted.map((u) {
-      final p = profiles[u.userId];
+    // // ✅ собираем view без сетевых запросов
+    // yield liveSorted.map((u) {
+    //   final p = profiles[u.userId];
       return LiveUserView(
-        userId: u.userId,
-        lat: u.lat,
-        lng: u.lng,
-        heading: u.heading,
+        userId: entry.key,
+        lat: pos.latitude,
+        lng: pos.longitude,
+        heading: state.heading,
+        accuracyM: state.accuracyM,
+        updatedAtMs: state.lastServerTs,
         name: (p?['name'] as String?) ?? 'User',
         img: (p?['img'] as String?) ?? (p?['photoUrl'] as String?),
       );
-    }).toList();
+    }).toList()
+          ..sort((a, b) => a.userId.compareTo(b.userId));
+
+    return views;
   }
+  void emitFrame() {
+    if (disposed) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    controller.add(buildFrame(nowMs));
+  }
+
+  final ticker = Timer.periodic(const Duration(milliseconds: frameIntervalMs), (_) => emitFrame());
+
+  Future<void> handleLive() async {
+    await for (final live in liveRepo.watchLiveUsers(groupId)) {
+      if (disposed) break;
+
+      if (live.isEmpty) {
+        motions.clear();
+        emitFrame();
+        continue;
+      }
+
+      final ids = live.map((u) => u.userId).toSet();
+      await fetchMissingProfiles(ids);
+
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+      motions.removeWhere((uid, _) => !ids.contains(uid));
+
+      for (final u in live) {
+        final candidatePos = LatLng(u.lat, u.lng);
+        if (u.accuracyM != null && u.accuracyM! > maxAccuracyM) {
+          continue;
+        }
+
+        final state = motions[u.userId];
+        if (state != null) {
+          final jump = distanceM(state.to, candidatePos);
+          if (jump > maxJumpM) continue;
+          state.updateTarget(
+            target: candidatePos,
+            serverTs: u.updatedAtMs ?? nowMs,
+            nowMs: nowMs,
+            minAnimMs: minAnimMs,
+            maxAnimMs: maxAnimMs,
+            headingRaw: u.heading,
+            accuracyRaw: u.accuracyM,
+          );
+        } else {
+          motions[u.userId] = _LiveUserMotionState.initial(
+            raw: u,
+            nowMs: nowMs,
+          );
+        }
+      }
+
+      emitFrame();
+    }
+  }
+
+  unawaited(handleLive());
+
+  ref.onDispose(() {
+    disposed = true;
+    ticker.cancel();
+    controller.close();
+    motions.clear();
+  });
+
+  yield* controller.stream; 
 });
 
 
@@ -173,3 +259,73 @@ final groupOwnerIdProvider =
         return data?['owner_id'] as String?;
       });
 });
+
+class _LiveUserMotionState {
+  _LiveUserMotionState({
+    required this.from,
+    required this.to,
+    required this.animStartMs,
+    required this.animEndMs,
+    required this.lastServerTs,
+    required this.heading,
+    required this.accuracyM,
+  });
+
+  LatLng from;
+  LatLng to;
+  int animStartMs;
+  int animEndMs;
+  int lastServerTs;
+  double? heading;
+  double? accuracyM;
+
+  factory _LiveUserMotionState.initial({
+    required LiveUserRtdb raw,
+    required int nowMs,
+  }) {
+    final ts = raw.updatedAtMs ?? nowMs;
+    return _LiveUserMotionState(
+      from: LatLng(raw.lat, raw.lng),
+      to: LatLng(raw.lat, raw.lng),
+      animStartMs: nowMs,
+      animEndMs: nowMs,
+      lastServerTs: ts,
+      heading: raw.heading,
+      accuracyM: raw.accuracyM,
+    );
+  }
+
+  void updateTarget({
+    required LatLng target,
+    required int serverTs,
+    required int nowMs,
+    required int minAnimMs,
+    required int maxAnimMs,
+    double? headingRaw,
+    double? accuracyRaw,
+  }) {
+    final current = positionAt(nowMs);
+    from = current;
+    to = target;
+    animStartMs = nowMs;
+
+    final diff = (serverTs - lastServerTs).abs();
+    final animDuration = diff.clamp(minAnimMs, maxAnimMs).toInt();
+    animEndMs = nowMs + animDuration;
+    lastServerTs = serverTs;
+
+    if (headingRaw != null) {
+      heading = headingRaw;
+    }
+    accuracyM = accuracyRaw ?? accuracyM;
+  }
+
+  LatLng positionAt(int nowMs) {
+    if (animEndMs <= animStartMs) return to;
+    final total = animEndMs - animStartMs;
+    final t = ((nowMs - animStartMs) / total).clamp(0.0, 1.0);
+    final lat = from.latitude + (to.latitude - from.latitude) * t;
+    final lng = from.longitude + (to.longitude - from.longitude) * t;
+    return LatLng(lat, lng);
+  }
+}

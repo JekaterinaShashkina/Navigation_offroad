@@ -30,6 +30,7 @@ class RouteTrackingRepository {
     String? groupId,
     double? heading,
     double? speed,
+    double? accuracyM,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -54,6 +55,7 @@ class RouteTrackingRepository {
       'lng': lng,
       if (heading != null) 'heading': heading,
       if (speed != null) 'speed': speed,
+      if (accuracyM != null) 'accuracy': accuracyM,
       'updatedAt': ServerValue.timestamp,
     };
 

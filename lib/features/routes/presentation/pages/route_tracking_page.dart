@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -12,6 +11,7 @@ import 'package:offroad_nav/features/groups/presentation/models/live_user_view.d
 import 'package:offroad_nav/features/routes/presentation/map/live_markers_builder.dart';
 import 'package:offroad_nav/features/routes/presentation/map/map_icons_loader.dart';
 import 'package:offroad_nav/features/routes/presentation/tracking/tracking_presence_service.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../design/widgets/app_bar.dart';
 import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
@@ -66,6 +66,22 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
   final _avatarIcons = <String, BitmapDescriptor>{};
   final _iconsLoader = MapIconsLoader();
   final _presence = TrackingPresenceService();
+  ProviderSubscription<AsyncValue<List<LiveUserView>>>? _liveSubscription;
+  ProviderSubscription<AsyncValue<String?>>? _ownerSubscription;
+
+  String? _leaderId;
+  LatLng? _leaderPosition;
+  double? _leaderHeading;
+  bool _followLeader = false;
+
+  LatLng? get _activePosition =>
+      (_followLeader && _leaderPosition != null) ? _leaderPosition : _currentPosition;
+
+  double get _activeBearing => _followLeader ? (_leaderHeading ?? _bearing) : _bearing;
+
+  LatLng? _lastCameraTarget;
+  double? _lastCameraBearing;
+  DateTime? _lastCameraMoveAt;
 
   bool get _showStartBanner =>
       widget.mode == TrackingMode.live &&
@@ -76,6 +92,7 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
 
     _uid = FirebaseAuth.instance.currentUser?.uid;
 
@@ -103,6 +120,7 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         groupId: widget.groupId,
         uid: _uid,
         bearing: _bearing,
+        accuracyM: s.accuracyM,
       );
 
       // ✅ RTDB live (только если groupId есть)
@@ -133,44 +151,149 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
       // 3) прогресс и камера
       _startTime ??= DateTime.now();
       _updateCameraPosition();
-      _updateRouteProgress(s.pos);
+      final progressPoint = _activePosition ?? s.pos;
+      _updateRouteProgress(progressPoint);
     });
     debugPrint('RouteTrackingPage mode=${widget.mode} groupId=${widget.groupId} uid=$_uid');
+
+    _listenLeaderLive();
   }
 
-Future<void> _loadIcons() async {
-  final arrow = await _iconsLoader.loadArrow();
-  final crown = await _iconsLoader.loadCrown();
-  if (!mounted) return;
-  setState(() {
-    _customMarkerIcon = arrow;
-    _crownIcon = crown;
-  });
-}
+  Future<void> _loadIcons() async {
+    final arrow = await _iconsLoader.loadArrow();
+    final crown = await _iconsLoader.loadCrown();
+    if (!mounted) return;
+    setState(() {
+      _customMarkerIcon = arrow;
+      _crownIcon = crown;
+    });
+  }
 
-  void _updateCameraPosition() {
-    if (_currentPosition == null || _controller == null) return;
+  void _listenLeaderLive() {
+      final gid = widget.groupId;
+      if (gid == null) return;
+
+      _ownerSubscription = ref.listen<AsyncValue<String?>>(
+        groupOwnerIdProvider(gid),
+        (previous, next) {
+          next.whenData((ownerId) {
+            if (!mounted) return;
+            setState(() => _leaderId = ownerId);
+          });
+        },
+        fireImmediately: true,
+      );
+
+      _liveSubscription = ref.listen<AsyncValue<List<LiveUserView>>>(
+        liveUsersWithProfilesProvider(gid),
+        (previous, next) {
+          next.whenData((users) {
+            final leaderId = _leaderId;
+            if (leaderId == null) return;
+
+            LiveUserView? leader;
+            for (final u in users) {
+              if (u.userId == leaderId) {
+                leader = u;
+                break;
+              }
+            }
+
+            if (!mounted) return;
+            setState(() {
+              if (leader != null) {
+                _leaderPosition = LatLng(leader.lat, leader.lng);
+                _leaderHeading = leader.heading;
+              } else {
+                _leaderPosition = null;
+                _leaderHeading = null;
+              }
+            });
+
+            if (_followLeader && _leaderPosition != null) {
+              _updateCameraPosition(
+                target: _leaderPosition,
+                bearing: _leaderHeading,
+              );
+              _updateRouteProgress(_leaderPosition!);
+            }
+          });
+        },
+        fireImmediately: true,
+      );
+    }
+
+  void _updateCameraPosition({LatLng? target, double? bearing}) {
+    final pos = target ?? _activePosition;
+    if (pos == null || _controller == null) return;
 
     _controller!.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
-          target: _currentPosition!,
+          target: pos,
           zoom: 18,
           tilt: 60,
-          bearing: _bearing,
+          bearing: _normalize(bearing ?? _activeBearing),
         ),
       ),
     );
+    //     final now = DateTime.now();
+    // if (_lastCameraMoveAt != null &&
+    //     now.difference(_lastCameraMoveAt!) < const Duration(milliseconds: 1200)) {
+    //   return;
+    // }
+
+    // final distance =
+    //     _lastCameraTarget != null ? distanceM(_lastCameraTarget!, _currentPosition!) : null;
+    // final bearingDelta =
+    //     _lastCameraBearing != null ? _bearingDelta(_bearing, _lastCameraBearing!) : null;
+
+    // const distanceThresholdM = 5.0;
+    // const bearingThresholdDeg = 6.0;
+
+    // if (distance != null &&
+    //     bearingDelta != null &&
+    //     distance <= distanceThresholdM &&
+    //     bearingDelta <= bearingThresholdDeg) {
+    //   return;
+    // }
+
+    // final cameraPosition = CameraPosition(
+    //   target: _currentPosition!,
+    //   zoom: 18,
+    //   tilt: 60,
+    //   bearing: _bearing,
+    // );
+    //     final isSmallShift = distance != null && distance < 15;
+    // final isSmallBearingChange = bearingDelta == null || bearingDelta < 10;
+
+    // if (isSmallShift && isSmallBearingChange) {
+    //   _controller!.moveCamera(CameraUpdate.newLatLng(_currentPosition!));
+    // } else {
+    //   _controller!.animateCamera(
+    //     CameraUpdate.newCameraPosition(cameraPosition),
+    //   );
+    // }
+
+    // _lastCameraTarget = _currentPosition;
+    // _lastCameraBearing = _normalize(_bearing);
+    // _lastCameraMoveAt = now;
   }
 
   void _updateRouteProgress(LatLng current) {
-    if (widget.mode == TrackingMode.simulated || _started) {
+    //if (widget.mode == TrackingMode.simulated || _started) {
+    final hasStarted = widget.mode == TrackingMode.simulated ||
+    _started ||
+    (_followLeader && _leaderPosition != null);
+
+    if (hasStarted) {
       traversedPoints.add(current);
     }
-    final hasStarted = widget.mode == TrackingMode.simulated || _started;
+
+    //final hasStarted = widget.mode == TrackingMode.simulated || _started;
     final remainingPoints =
-        hasStarted && _currentPosition != null && widget.points.isNotEmpty
-            ? widget.points.sublist(_closestPointIndex(_currentPosition!))
+        hasStarted && widget.points.isNotEmpty
+            ? widget.points.sublist(_closestPointIndex(current))
             : widget.points;
 
     remainingDistance = 0.0;
@@ -207,8 +330,8 @@ Future<void> _loadIcons() async {
     return index;
   }
 
-void _warmUpAvatars(List<LiveUserView> users) async {
-bool changed = false;
+  void _warmUpAvatars(List<LiveUserView> users) async {
+    bool changed = false;
     for (final u in users) {
       if (_avatarIcons.containsKey(u.userId)) continue;
       try {
@@ -227,15 +350,49 @@ bool changed = false;
     if (changed && mounted) {
       setState(() {});
     }
-}
+  }
 
   @override
   void dispose() {
     // ✅ убрать live запись при выходе (если группа была)
     unawaited(_presence.stopSharing(ref: ref, groupId: widget.groupId, uid: _uid));
     _sub?.cancel();
+    _liveSubscription?.close();
+    _ownerSubscription?.close();
     _source.dispose();
+    WakelockPlus.disable();
     super.dispose();
+  }
+
+  void _toggleFollowLeader() {
+    if (_leaderId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Leader is not defined for this group yet'),
+          backgroundColor: buttonBackgroundColor,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _followLeader = !_followLeader);
+
+    if (_followLeader && _leaderPosition != null) {
+      _updateCameraPosition(
+        target: _leaderPosition,
+        bearing: _leaderHeading,
+      );
+      _updateRouteProgress(_leaderPosition!);
+    }
+
+    if (_followLeader && _leaderPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Waiting for the leader location...'),
+          backgroundColor: buttonBackgroundColor,
+        ),
+      );
+    }
   }
 
   @override
@@ -243,13 +400,14 @@ bool changed = false;
     final traversed = (_started || widget.mode == TrackingMode.simulated)
         ? traversedPoints.toList()
         : <LatLng>[];
-
-    final currentIndex = (_currentPosition != null)
-        ? _closestPointIndex(_currentPosition!)
+    final currentIndex = (_activePosition != null)
+        ? _closestPointIndex(_activePosition!)
         : 0;
 
     final remaining =
         widget.points.isNotEmpty ? widget.points.sublist(currentIndex) : <LatLng>[];
+
+    final routePolyline = widget.points;
 
     // ✅ live users из RTDB только если есть groupId
     final gid = widget.groupId;
@@ -261,21 +419,21 @@ bool changed = false;
         : ref.watch(groupOwnerIdProvider(gid));
         
     final liveMarkers = liveAsync.when(
-  data: (users) => buildLiveMarkers(
-    users: users,
-    warmUpAvatars: _warmUpAvatars,
-    avatarIcons: _avatarIcons,
-    myUid: _uid,
-    leaderId: ownerAsync.asData?.value,
-    crownIcon: _crownIcon,
-  ),
-  loading: () => <Marker>{},
-  error: (e, st) {
-    debugPrint('liveUsersWithProfilesProvider error: $e');
-    debugPrintStack(stackTrace: st);
-    return <Marker>{};
-  },
-);
+      data: (users) => buildLiveMarkers(
+        users: users,
+        warmUpAvatars: _warmUpAvatars,
+        avatarIcons: _avatarIcons,
+        myUid: _uid,
+        leaderId: ownerAsync.asData?.value,
+        crownIcon: _crownIcon,
+      ),
+      loading: () => <Marker>{},
+      error: (e, st) {
+        debugPrint('liveUsersWithProfilesProvider error: $e');
+        debugPrintStack(stackTrace: st);
+        return <Marker>{};
+      },
+    );
 
     return Scaffold(
       appBar: NewAppBar(
@@ -293,16 +451,25 @@ bool changed = false;
             ),
             polylines: {
               Polyline(
+                polylineId: const PolylineId('route'),
+                color: Colors.blue,
+                width: 4,
+                points: routePolyline,
+                zIndex: 0,
+              ),
+              Polyline(
                 polylineId: const PolylineId('traversed'),
                 color: Colors.green,
                 width: 5,
                 points: traversed,
-              ),
-              Polyline(
-                polylineId: const PolylineId('remaining'),
-                color: Colors.blue,
-                width: 4,
-                points: remaining,
+                zIndex: 1,
+              //),
+              // Polyline(
+              //   polylineId: const PolylineId('remaining'),
+              //   color: Colors.blue,
+              //   width: 4,
+              //   points: remaining,
+
               ),
             },
             markers: {
@@ -384,6 +551,20 @@ bool changed = false;
                 ),
               ),
             ),
+                      if (widget.groupId != null)
+            Positioned(
+              bottom: padding16,
+              right: padding16,
+              child: FloatingActionButton.extended(
+                heroTag: 'follow_leader_btn',
+                backgroundColor:
+                    _followLeader ? buttonBackgroundColor : surfaceColor,
+                foregroundColor: Colors.black,
+                onPressed: _toggleFollowLeader,
+                label: Text(_followLeader ? 'Following leader' : 'Follow leader'),
+                icon: Icon(_followLeader ? Icons.visibility : Icons.person_pin_circle),
+              ),
+            ),
         ],
       ),
     );
@@ -393,5 +574,9 @@ bool changed = false;
     deg %= 360;
     if (deg < 0) deg += 360;
     return deg;
+  }
+    double _bearingDelta(double a, double b) {
+    final diff = (_normalize(a) - _normalize(b)).abs();
+    return diff > 180 ? 360 - diff : diff;
   }
 }

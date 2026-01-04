@@ -32,8 +32,12 @@ class TrackerController extends ChangeNotifier {
   LatLng? _lastAcceptedPos;    // предыдущая принятая позиция (после фильтров)
   double _markerRot = 0;       // сглажённый курс, deg
   double _compassDeg = 0;      // последний heading компаса, deg
+  double _lastCompassDeg = 0;  // heading компаса на прошлом тике
+  double _lastHeadingDeg = 0;  // целевой heading на прошлом тике (после всех поправок)
+  double _lastRawHeadingDeg = 0; // heading до докрутки PNG
   int _lastUpdateMs = 0;
   
+  final List<double> _headingWindow = <double>[];
 // 🔽 НОВОЕ
 double _lastSpeedMps = 0;
 double get speedMps => _lastSpeedMps;
@@ -47,10 +51,16 @@ double get speedKmh => _lastSpeedMps * 3.6;
   static const int    _MIN_UPDATE_MS = 800; // мин. интервал между апдейтами
   static const double _MAX_JUMP_M = 40;     // отфильтровывать "прыжки" дальше этого
   static const double _MOVE_SPEED_MPS = 0.8;// "движемся", если скорость выше
-  static const double _TURN_ALPHA = 0.2;    // сглаживание вращения (0..1)
-
+  static const double _HEADING_STILL_SPEED = 1.5; // "почти стоим", не дёргать компас
+  static const double _COMPASS_JITTER_DEG = 4;    // игнорировать мелкие изменения компаса
+  static const double _TURN_ALPHA_MIN = 0.1;      // сглаживание вращения при низкой скорости
+  static const double _TURN_ALPHA_MAX = 0.25;     // сглаживание вращения при высокой скорости
+  static const double _TURN_ALPHA_SPEED_MAX = 5;  // скорость, на которой берём max alpha
+  static const double _POS_MIN_STEP_M = 2;        // отбрасывать шаги меньше этого
+  static const double _POS_SMOOTH_ALPHA = 0.35;   // сглаживание позиции (0..1)
+  static const int _HEADING_WINDOW_SIZE = 5;
   /// Если PNG стрелки "смотрит вниз" — ставим false (докрутка +180°).
-  static const bool _ARROW_POINTS_UP = false;
+  static const bool _ARROW_POINTS_UP = true;
 
   // ----- публичные методы -----
 
@@ -63,8 +73,8 @@ double get speedKmh => _lastSpeedMps * 3.6;
     });
 
     // разрешения локации
-  final ok = await ensureLocationPermissions(_loc);
-  if (!ok) return;
+    final ok = await ensureLocationPermissions(_loc);
+    if (!ok) return;
 
     // точные апдейты
     await _loc.changeSettings(
@@ -95,26 +105,27 @@ void dispose() {
 }
 
   // запись
-Future<void> startRecording() async {
-if (_isRecording) return;
-debugPrint('OFFROAD 🔥🔥🔥startRecording pressed, isRecording=$_isRecording');
-  // 1) СРАЗУ включаем запись (UI не должен ждать)
-  _isRecording = true;
-  notifyListeners();
-  // 2) Дальше — фон (не должен ломать старт)
-  try {
-    final ok = await ensureLocationPermissions(_loc);
-    if (!ok) {
-      _isRecording = false;
-      notifyListeners();
-      return;
+  Future<void> startRecording() async {
+    if (_isRecording) return;
+    debugPrint('OFFROAD 🔥🔥🔥startRecording pressed, isRecording=$_isRecording');
+    // 1) СРАЗУ включаем запись (UI не должен ждать)
+    _isRecording = true;
+    notifyListeners();
+    // 2) Дальше — фон (не должен ломать старт)
+    try {
+      final ok = await ensureLocationPermissions(_loc);
+      if (!ok) {
+        _isRecording = false;
+        notifyListeners();
+        return;
+      }
+      // удерживаем бодрствующее устройство
+      await _loc.enableBackgroundMode(enable: true);
+    } catch (e) {
+      // если фон не включился — запись всё равно может работать на экране
+      debugPrint('enableBackgroundMode failed: $e');
     }
-    // await _loc.enableBackgroundMode(enable: true);
-  } catch (e) {
-    // если фон не включился — запись всё равно может работать на экране
-    debugPrint('enableBackgroundMode failed: $e');
   }
-}
 
 Future<void> pauseRecording() async {
   if (!_isRecording) return;
@@ -155,39 +166,100 @@ Future<void> clearTrack() async {
     if (_lastAcceptedPos != null && distanceM(_lastAcceptedPos!, pos) > _MAX_JUMP_M) {
       return;
     }
+        // --- позиция (сглаживание) ---
+    final filteredPos = _filterPosition(pos);
     final prev = _lastAcceptedPos;
+
     // --- курс ---
     final speed = (l.speed ?? 0).toDouble(); // м/с
     _lastSpeedMps = speed;                   // 🔽 запоминаем скорость
-    final locHeading = l.heading;        // может быть null
-    double targetDeg = _compassDeg;      // по умолчанию — компас (стоит)
+    final locHeading = l.heading; // может быть null
+    final compassDelta = _angleDeltaDeg(_compassDeg, _lastCompassDeg);
+    _lastCompassDeg = _compassDeg;   
 
-    if (speed > _MOVE_SPEED_MPS) {
-      if (locHeading != null && locHeading >= 0) {
-        targetDeg = locHeading;          // идеал в движении
-      } else if (prev != null) {
-        targetDeg = bearingDeg(prev, pos);
-      }
+    double targetDeg = _compassDeg;      // по умолчанию — компас (стоит)
+    double? moveBearing;
+
+      if (speed > _MOVE_SPEED_MPS && locHeading != null && locHeading >= 0) {
+      moveBearing = locHeading;          // идеал в движении
+    } else if (prev != null) {
+      moveBearing = bearingDeg(prev, filteredPos);
     }
+        if (speed < _HEADING_STILL_SPEED &&
+        compassDelta.abs() < _COMPASS_JITTER_DEG &&
+        _headingWindow.isNotEmpty) {
+      targetDeg = _lastRawHeadingDeg;    // стоим и компас не изменился — не дёргаем
+    } else if (moveBearing != null) {
+      targetDeg = moveBearing;
+    }
+
+    targetDeg = _smoothHeading(targetDeg);
+    final rawHeading = targetDeg;
 
     if (!_ARROW_POINTS_UP) {
       targetDeg = (targetDeg + 180) % 360; // докрутка если PNG вниз
     }
 
-    _markerRot = lerpAngle(_markerRot, targetDeg, _TURN_ALPHA);
+     _markerRot = lerpAngle(_markerRot, targetDeg, _turnAlphaForSpeed(speed));
+
+    _lastRawHeadingDeg = rawHeading;
+    _lastHeadingDeg = targetDeg;
 
     // --- позиция ---
-    _lastAcceptedPos = pos;
-    _currentPos = pos;
+    _lastAcceptedPos = filteredPos;
+    _currentPos = filteredPos;
 
     // запись трека — не чаще, чем каждые ~3м
     if (_isRecording) {
-  final shouldAdd = track.isEmpty || distanceM(track.last, pos) > 3;
-  debugPrint('OFFROAD 🔥REC isRecording=$_isRecording trackLen=${track.length} shouldAdd=$shouldAdd');
-  if (shouldAdd) track.add(pos);
+      final shouldAdd = track.isEmpty || distanceM(track.last, filteredPos) > 3;
+      debugPrint('OFFROAD 🔥REC isRecording=$_isRecording trackLen=${track.length} shouldAdd=$shouldAdd');
+      if (shouldAdd) track.add(filteredPos);
     }
 
     notifyListeners();
   }
+ double _turnAlphaForSpeed(double speed) {
+    final double clamped = speed.clamp(0, _TURN_ALPHA_SPEED_MAX).toDouble();
+    final t = clamped / _TURN_ALPHA_SPEED_MAX;
+    return _TURN_ALPHA_MIN + (_TURN_ALPHA_MAX - _TURN_ALPHA_MIN) * t;
+  }
 
+  double _angleDeltaDeg(double a, double b) {
+    return (((a - b + 540) % 360) - 180);
+  }
+
+  double _unwrapHeading(double heading) {
+    if (_headingWindow.isEmpty) return heading;
+    final last = _headingWindow.last;
+    final diff = _angleDeltaDeg(heading, last);
+    return last + diff;
+  }
+
+  double _smoothHeading(double targetDeg) {
+    final unwrapped = _unwrapHeading(targetDeg);
+    _headingWindow.add(unwrapped);
+    if (_headingWindow.length > _HEADING_WINDOW_SIZE) {
+      _headingWindow.removeAt(0);
+    }
+    final sorted = List<double>.from(_headingWindow)..sort();
+    final mid = sorted.length ~/ 2;
+    final median = sorted.length.isOdd
+        ? sorted[mid]
+        : (sorted[mid - 1] + sorted[mid]) / 2;
+    return median % 360;
+  }
+
+  LatLng _filterPosition(LatLng raw) {
+    final prev = _lastAcceptedPos;
+    if (prev == null) return raw;
+
+    final dist = distanceM(prev, raw);
+    if (dist < _POS_MIN_STEP_M) {
+      return prev; // мелкая дрожь — оставляем старое
+    }
+
+    final lat = prev.latitude + (raw.latitude - prev.latitude) * _POS_SMOOTH_ALPHA;
+    final lon = prev.longitude + (raw.longitude - prev.longitude) * _POS_SMOOTH_ALPHA;
+    return LatLng(lat, lon);
+  }
 }
