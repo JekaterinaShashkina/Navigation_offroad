@@ -13,6 +13,7 @@ class TrackingPresenceService {
     required String? uid,
     required double bearing,
     double? accuracyM,
+    
   }) async {
     // 1) users/location (твоя текущая логика)
     await RouteTrackingRepository.instance.sendLocation(
@@ -26,6 +27,8 @@ class TrackingPresenceService {
     if (groupId == null || uid == null) return;
 
     final liveRepo = ref.read(groupsLiveRepositoryProvider);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    
     await liveRepo.upsertMyLiveLocation(
       groupId: groupId,
       userId: uid,
@@ -33,6 +36,7 @@ class TrackingPresenceService {
       lng: pos.longitude,
       heading: bearing,
       accuracyM: accuracyM,
+      updatedAtMs: nowMs,
     );
   }
 

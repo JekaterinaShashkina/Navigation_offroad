@@ -168,7 +168,8 @@ class GroupsLiveRepository {
     required double lng,
     double? heading,
     double? speed,
-    double? accuracyM,
+    double? accuracyM, 
+    required int updatedAtMs,
   }) async {
     final ref = _meRef(groupId, userId);
 

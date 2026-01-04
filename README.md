@@ -73,7 +73,7 @@ OFFROAD_NAV/
 
 Клонирование проекта
 ```sh
-git clone https://github.com/vitalitrifonov/navigation_offroad.git
+git clone https://github.com/JekaterinaShashkina/Navigation_offroad.git
 cd navigation_offroad
 ```
 Установка зависимостей и запуск
