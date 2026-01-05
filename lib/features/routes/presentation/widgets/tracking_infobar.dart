@@ -5,6 +5,7 @@ class TrackingInfoBar extends StatelessWidget {
     super.key,
     required this.started,
     required this.distToStartM,
+    required this.traversedMeters,
     required this.remainingMeters,
     required this.eta,
     required this.elapsed,
@@ -12,18 +13,19 @@ class TrackingInfoBar extends StatelessWidget {
 
   final bool started;
   final double? distToStartM;
+  final double traversedMeters;
   final double remainingMeters;
   final Duration eta;
   final Duration elapsed;
 
-  String _fmtKm(double meters) => (meters / 1000).toStringAsFixed(2);
+  String _fmtKm(double meters) => (meters / 1000).toStringAsFixed(1);
   String _fmtMin(Duration d) => '${d.inMinutes} min';
 
   @override
   Widget build(BuildContext context) {
     final text = !started
         ? 'Go to the start: ${(distToStartM ?? 0).toStringAsFixed(0)} m'
-        : 'Distance left: ${_fmtKm(remainingMeters)} km\n'
+        : 'Traversed ${_fmtKm(traversedMeters)}km, Distance left: ${_fmtKm(remainingMeters)} km\n'
           'Time left: ${eta == Duration.zero ? '—' : _fmtMin(eta)} • Elapsed: ${_fmtMin(elapsed)}';
 
     return SafeArea(

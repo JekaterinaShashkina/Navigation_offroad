@@ -8,6 +8,8 @@ class RouteProgressState {
 
   final int closestIndex;        // индекс на маршруте
   final double remainingMeters;
+  final int maxIndexReached;
+  final double traversedMeters;
   final Duration eta;
 
   final double? distanceToStartM; // для баннера "подойди к старту"
@@ -20,6 +22,8 @@ class RouteProgressState {
     required this.bearingDeg,
     required this.closestIndex,
     required this.remainingMeters,
+    required this.maxIndexReached,
+    required this.traversedMeters,
     required this.eta,
     required this.distanceToStartM,
     required this.startTime,
@@ -32,6 +36,8 @@ class RouteProgressState {
     bearingDeg: 0,
     closestIndex: 0,
     remainingMeters: 0,
+    maxIndexReached: 0,
+    traversedMeters: 0,
     eta: Duration.zero,
     distanceToStartM: null,
     startTime: null,
@@ -43,6 +49,8 @@ class RouteProgressState {
     double? bearingDeg,
     int? closestIndex,
     double? remainingMeters,
+    int? maxIndexReached,
+    double? traversedMeters,
     Duration? eta,
     double? distanceToStartM,
     DateTime? startTime,
@@ -53,8 +61,10 @@ class RouteProgressState {
       bearingDeg: bearingDeg ?? this.bearingDeg,
       closestIndex: closestIndex ?? this.closestIndex,
       remainingMeters: remainingMeters ?? this.remainingMeters,
+      maxIndexReached: maxIndexReached ?? this.maxIndexReached,
+      traversedMeters: traversedMeters ?? this.traversedMeters,
       eta: eta ?? this.eta,
-      distanceToStartM: distanceToStartM,
+      distanceToStartM: distanceToStartM ?? this.distanceToStartM,
       startTime: startTime ?? this.startTime,
     );
   }
@@ -79,6 +89,23 @@ class RouteTrackingController {
     return index;
   }
 
+  int closestPointIndexWindow(List<LatLng> route, LatLng pos, int prevIdx) {
+  const window = 40; // можно 20–60
+  final start = (prevIdx - window).clamp(0, route.length - 1);
+  final end = (prevIdx + window).clamp(0, route.length - 1);
+
+  double minDist = double.infinity;
+  int best = prevIdx.clamp(0, route.length - 1);
+
+  for (int i = start; i <= end; i++) {
+    final d = distanceM(pos, route[i]);
+    if (d < minDist) {
+      minDist = d;
+      best = i;
+    }
+  }
+  return best;
+}
   void updatePosition({
     required List<LatLng> route,
     required LatLng pos,
@@ -89,27 +116,32 @@ class RouteTrackingController {
 
       bool started = _state.started;
       DateTime? startTime = _state.startTime;
-      double? distToStartM = _state.distanceToStartM;
+      double? distToStartM = distanceM(pos, route.first);
 
-    // start-gate logic (только live)
-      if (isLiveMode && !_state.started) {
-        final dist = distanceM(pos, route.first);
-        if (dist <= startRadiusM) {
-            started = true;
-            startTime = DateTime.now();
-            distToStartM = null;
-          } else {
-            distToStartM = dist;
-          }
-        }
+    // start-gate logic для обоих режимов: фиксируем старт, когда подошли
+    // к первой точке маршрута.
+    if (!started) {
+      if (distToStartM <= startRadiusM) {
+        started = true;
+        startTime = DateTime.now();
+        distToStartM = null;
+      }
+    }
 
     // if (!isLiveMode && !started) {
     //   started = true;
     //   startTime = DateTime.now();
     //   distToStartM = null;
     // }
+    final prev = _state.maxIndexReached;
+    final rawIdx = closestPointIndexWindow(route, pos, prev);
 
-    final idx = closestPointIndex(route, pos);
+    int idx = rawIdx < prev ? prev : rawIdx;
+
+    const maxJump = 8;
+    if (idx - prev > maxJump) idx = prev + maxJump;
+
+    
 
     // remaining distance по маршруту (не по GPS)
     double remaining = 0;
@@ -117,33 +149,32 @@ class RouteTrackingController {
       remaining += distanceM(route[i], route[i + 1]);
     }
 
-  final elapsed = startTime == null
-      ? Duration.zero
-      : DateTime.now().difference(startTime);
+    // Простейшая ETA: средняя скорость = (пройденная по маршруту)/(time)
+      final traversedMeters = _routeDistance(route.sublist(0, idx + 1));
+    
+    final elapsed = startTime == null
+        ? Duration.zero
+        : DateTime.now().difference(startTime);
 
     // Простейшая ETA: средняя скорость = (пройденная по маршруту)/(time)
-    final traversedMeters = idx > 0
-      ? _routeDistance(route.sublist(0, idx + 1))
-      : 0.0;
+    final avgSpeed = started && elapsed.inSeconds > 0
+        ? traversedMeters / elapsed.inSeconds
+        : 0.0;
 
-    final avgSpeed = elapsed.inSeconds > 0 
-      ? traversedMeters / elapsed.inSeconds 
-      : 0.0;
+    final eta = started && avgSpeed > 0
+        ? Duration(seconds: (remaining / avgSpeed).round())
+        : Duration.zero;
 
-    final eta = avgSpeed > 0 
-      ? Duration(seconds: (remaining / avgSpeed).round()) 
-      : Duration.zero;
-
-      print('****************idx=$idx remaining=$remaining started=$started elapsed=${elapsed.inSeconds}');
-      print('isLiveMode=$isLiveMode idx=$idx started=$started');
     _state = _state.copyWith(
       started: started,
       startTime: startTime,
-      distanceToStartM: distToStartM,
+      distanceToStartM: started ? null : distToStartM,
       currentPos: pos,
       bearingDeg: bearingDeg,
       closestIndex: idx,
       remainingMeters: remaining,
+      maxIndexReached: idx,
+      traversedMeters: traversedMeters,
       eta: eta,
       );
   }

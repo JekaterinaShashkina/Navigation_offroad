@@ -230,7 +230,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                   MaterialPageRoute(
                     builder: (context) => RouteTrackingPage(
                       points: _routePoints,
-                      mode: TrackingMode.live,
+                      mode: TrackingMode.simulated,
                       groupId: widget.groupId,
                       // mode: TrackingMode.live,
                     ),

@@ -11,6 +11,7 @@ import 'package:offroad_nav/features/groups/application/providers/groups_provide
 import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
 import 'package:offroad_nav/features/routes/presentation/map/live_markers_builder.dart';
 import 'package:offroad_nav/features/routes/presentation/map/map_icons_loader.dart';
+import 'package:offroad_nav/features/routes/presentation/map/route_markers_builder.dart';
 import 'package:offroad_nav/features/routes/presentation/tracking/tracking_presence_service.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/route_action_bar.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/tracking_bottom_controls.dart';
@@ -352,6 +353,7 @@ void _toggleFollowLeader() {
         ? const AsyncValue<List<LiveUserView>>.data(<LiveUserView>[])
         : ref.watch(liveUsersWithProfilesProvider(gid));
 
+    final routeMarkers = buildRouteStartEndMarkers(points: widget.points);
     final liveMarkers = liveUsersAsync.when(
       data: (users) {
           final now = DateTime.now().millisecondsSinceEpoch;
@@ -421,7 +423,7 @@ void _toggleFollowLeader() {
                   : const LatLng(59.4370, 24.7536),
               zoom: 16,
             ),
-            markers: {...liveMarkers, ...myMarker},
+            markers: {...routeMarkers, ...liveMarkers, ...myMarker},
             polylines: {routePolyline, traversedPolyline},
             onMapCreated: (c) => _controller = c,
           ),
@@ -473,6 +475,7 @@ void _toggleFollowLeader() {
               child: TrackingInfoBar(
                 started: started,
                 distToStartM: distToStart,
+                traversedMeters: st.traversedMeters,
                 remainingMeters: st.remainingMeters,
                 eta: st.eta,
                 elapsed: elapsed,
