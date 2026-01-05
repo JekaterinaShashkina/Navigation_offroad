@@ -13,210 +13,125 @@ import 'package:offroad_nav/features/competition/presentation/widgets/filter_pil
 import 'create_competition_page.dart';
 import 'competition_view_page.dart';
 
-class CompetitionsPage extends ConsumerStatefulWidget  {
+class CompetitionsPage extends ConsumerStatefulWidget {
   const CompetitionsPage({super.key});
 
   @override
   ConsumerState<CompetitionsPage> createState() => _CompetitionsPageState();
 }
 
-enum _Filter { all, completed }
+class _CompetitionsPageState extends ConsumerState<CompetitionsPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
 
-class _CompetitionsPageState extends ConsumerState<CompetitionsPage> {
-  final _search = TextEditingController();
-  String _query = '';
-  _Filter _filter = _Filter.all;
-
-  // // демо-данные
-  // final _items = const <_CompetitionVM>[
-  //   _CompetitionVM(
-  //     title: 'Bangabandhu Military Museum',
-  //     place: 'Mumbai plaza green Road Taj tower',
-  //   ),
-  //   _CompetitionVM(
-  //     title: 'Paradies Sweets',
-  //     place: 'Rupokotha Road Mumbai india',
-  //     completed: true,
-  //   ),
-  //   _CompetitionVM(
-  //     title: 'Cheez & Beanz',
-  //     place: 'Tajmohal Road Shekhertck Mumbai',
-  //   ),
-  //   _CompetitionVM(
-  //     title: 'Royal Group of Industries',
-  //     place: 'Mumbai plaza green Road Taj tower',
-  //     completed: true,
-  //   ),
-  //   _CompetitionVM(
-  //     title: 'SP Filling Station',
-  //     place: 'Mumbai plaza green Road Taj tower',
-  //   ),
-  // ];
+    @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
 
   @override
   void dispose() {
-    _search.dispose();
+    _tabController.dispose();
     super.dispose();
-  }
-
-  List<Competition> _applyFilter(List<Competition> items) {
-    final q = _query.trim().toLowerCase();
-
-    return items.where((e) {
-      if (_filter == _Filter.completed && !e.isCompleted) return false;
-
-      if (q.isEmpty) return true;
-      
-      final title = e.title.toLowerCase();
-      final desc = (e.description ?? '').toLowerCase();
-
-      return title.toLowerCase().contains(q) || desc.contains(q);
-    }).toList();
-  }
+  }  
 
   @override
   Widget build(BuildContext context) {
-    final competitionsAsync = ref.watch(myCompetitionsProvider);
+    final competitionsAsync = ref.watch(competitionsListProvider);
     
     return Scaffold(
       backgroundColor: backgroundMainColor,
-      appBar: NewAppBar(
-        title: 'My competitions', onPressed: () => Navigator.pop(context),
+      appBar: AppBar(
+        title: const Text('Competitions'),
+        leading: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back)),
+        actions: [
+          IconButton(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateCompetitionPage()),
+              );
+            },
+            icon: const Icon(Icons.add),
+          ),
+        ],      
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(padding16, padding16, padding16, padding16),
-        child: Column(
-          children: [
-            // Search
-            SizedBox(
-              height: 50,
-              child: TextField(
-                controller: _search,
-                onChanged: (v) => setState(() => _query = v),
-                decoration: InputDecoration(
-                  hintText: 'Search....',
-                  hintStyle: hintTextStyle,
-                  prefixIcon: const Icon(Icons.search, color: textHintColor),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: padding16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: Color(0xFFE6E6EA)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: Color(0xFFE6E6EA)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(color: Color(0xFFD0D0D6)),
-                  ),
-                  filled: true,
-                  fillColor: surfaceColor,
-                ),
-              ),
-            ),
-            const SizedBox(height: height12),
+body: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            indicatorColor: textHintColor,
+            labelColor: Colors.black,
+            tabs: const [
+              Tab(text: 'Upcoming'),
+              Tab(text: 'Active'),
+              Tab(text: 'Past'),
+            ],
+          ),
+          Expanded(
+            child: competitionsAsync.when(
+              data: (items) {
+                final upcoming =
+                    items.where((c) => c.status == CompetitionStatus.upcoming).toList();
+                final active =
+                    items.where((c) => c.status == CompetitionStatus.active).toList();
+                final past =
+                    items.where((c) => c.status == CompetitionStatus.ended).toList();
 
-            // Tabs
-            Row(
-              children: [
-                FilterPill(
-                  label: 'All',
-                  selected: _filter == _Filter.all,
-                  onTap: () => setState(() => _filter = _Filter.all),
-                ),
-                const SizedBox(width: 12),
-                FilterPill(
-                  label: 'Completed',
-                  selected: _filter == _Filter.completed,
-                  onTap: () => setState(() => _filter = _Filter.completed),
-                ),
-                const Spacer(),
-                Container(
-                  height: 36,
-                  width: 64,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE6E6EA),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: height12),
-
-            // Список
-            Expanded(
-              child: competitionsAsync.when(
-                data: (items) {
-                  final filtered = _applyFilter(items);
-                  if (filtered.isEmpty) {
-                    return const Center(
-                      child: Text('Nothing found', style: hintTextStyle),
-                    );
-                  }
-              return ListView.separated(
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, i) {
-                        final item = filtered[i];
-                        return CompetitionCard(
-                          title: item.title,
-                          subtitle: item.description ?? item.rule,
-                          completed: item.isCompleted,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CompetitionViewPage(
-                                  competition: item,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    );
-                },
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (e, st) => Center(
-                  child: Text(
-                    'Failed to load competitions',
-                    style: hintTextStyle,
-                  ),
-                ),
-              ),
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildList(context, upcoming),
+                    _buildList(context, active),
+                    _buildList(context, past),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Failed to load competitions\n$e')),
             ),
 
-            const SizedBox(height: height12),
-
-            // Кнопка "Create a competition"
-            SizedBox(
-              height: 50,
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CreateCompetitionPage()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  elevation: 0,
-                  shape: const StadiumBorder(),
-                  backgroundColor: const Color(0xFFF4C84A),
-                  foregroundColor: Colors.black,
-                ),
-                child: const Text(
-                  'Create a competition',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
-        ),
+                      ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CreateCompetitionPage()),
+          );
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }
-}
+  Widget _buildList(BuildContext context, List<Competition> items) {
+    if (items.isEmpty) {
+      return const Center(
+        child: Text(
+          'No competitions yet',
+          style: TextStyle(color: textHintColor),
+        ),
+);
+    }
 
+    return ListView.separated(
+      padding: const EdgeInsets.all(padding16),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final competition = items[index];
+        return CompetitionCard(
+          competition: competition,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CompetitionViewPage(competitionId: competition.id),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
