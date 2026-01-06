@@ -46,7 +46,7 @@ class LeaderboardTable extends StatelessWidget {
                 child: Text('$rank'),
               ),
               title: Text(name),
-              subtitle: Text(item.participant?.uid ?? ''),
+              //subtitle: Text(item.participant?.uid ?? ''),
               trailing: Text(time),
             );
           },

@@ -9,6 +9,7 @@ class Competition {
   final String description;
   final String rulesText;
   final String routeId;
+  final String? routeName;
   final DateTime startAt;
     final DateTime endAt;
   final String createdBy;
@@ -18,12 +19,13 @@ class Competition {
   // final String ownerId;
   // final String status;     // 'draft' | 'active' | 'completed' | etc.
 
-  const Competition( {
+  const Competition(  {
     required this.id,
     required this.name,
     required this.description,
     required this.rulesText,
     required this.routeId,
+    this.routeName,
     required this.startAt,
     required this.endAt,
     required this.createdBy,
@@ -49,6 +51,7 @@ class Competition {
       description: (data['description'] as String? ?? '').trim(),
       rulesText: (data['rulesText'] as String? ?? data['rule'] as String? ?? '').trim(),
       routeId: (data['routeId'] as String? ?? data['route_id'] as String? ?? '').trim(),
+      routeName: (data['routeName'] as String?)?.trim(),
       startAt: (data['startAt'] as Timestamp?)?.toDate() ??
           (data['start_time'] as Timestamp?)?.toDate() ??
           DateTime.now(),
@@ -66,6 +69,7 @@ class Competition {
       'description': description,
       'rulesText': rulesText,
       'routeId': routeId,
+      'routeName': routeName,
       'startAt': Timestamp.fromDate(startAt),
       'endAt': Timestamp.fromDate(endAt),
       'createdBy': createdBy,

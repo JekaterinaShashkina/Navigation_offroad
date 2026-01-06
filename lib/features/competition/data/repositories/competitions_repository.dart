@@ -10,6 +10,7 @@ class CompetitionInput {
   final String description;
   final String rulesText;
   final String routeId;
+  final String routeName;
   final DateTime startAt;
   final DateTime endAt;
   // final String vehicle;
@@ -19,6 +20,7 @@ class CompetitionInput {
     required this.description,
     required this.rulesText,
     required this.routeId,
+    required this.routeName,
     required this.startAt,
     required this.endAt,
     //required this.vehicle,
@@ -74,6 +76,7 @@ class CompetitionsRepository {
       'description': input.description.trim(),
       'rulesText': input.rulesText.trim(),
       'routeId': input.routeId,
+      'routeName': input.routeName.trim(),
       'startAt': Timestamp.fromDate(input.startAt),
       'endAt': Timestamp.fromDate(input.endAt),
       'createdBy': uid,
@@ -114,14 +117,26 @@ class CompetitionsRepository {
     }
 
     Future<void> joinCompetition(String competitionId) async {
-    final user = _auth.currentUser;
+    // final user = _auth.currentUser;
     final uid = _requireUser();
+  // 1) читаем профиль из твоей коллекции users
+  final userSnap =
+      await FirebaseFirestore.instance.collection('users').doc(uid).get();
+  final userData = userSnap.data() ?? const <String, dynamic>{};
 
-    await _participants(competitionId).doc(uid).set({
-      'displayName': user?.displayName,
-      'photoUrl': user?.photoURL,
-      'joinedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  final name = (userData['name'] as String?)?.trim();
+  final img = (userData['img'] as String?)?.trim();
+
+  // fallback если вдруг пусто
+  final fallbackName = _auth.currentUser?.email?.split('@').first ?? 'User';
+
+  // 2) пишем участника в competition participants
+  await _participants(competitionId).doc(uid).set({
+    'uid': uid,
+    'displayName': (name != null && name.isNotEmpty) ? name : fallbackName,
+    'photoUrl': (img != null && img.isNotEmpty) ? img : null,
+    'joinedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
   }
 
     Future<void> leaveCompetition(String competitionId) async {

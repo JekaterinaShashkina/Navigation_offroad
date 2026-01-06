@@ -1,14 +1,20 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
+import 'package:offroad_nav/design/widgets/smart_avatar.dart';
+
 import 'package:offroad_nav/features/competition/application/providers/competitions_providers.dart';
 import 'package:offroad_nav/features/competition/domain/entities/competition.dart';
 import 'package:offroad_nav/features/competition/domain/entities/competition_attempt.dart';
 import 'package:offroad_nav/features/competition/presentation/widgets/leaderboard_table.dart';
+
+// твои pill-компоненты
+import 'package:offroad_nav/features/competition/presentation/widgets/pill_nav_row.dart';
 
 class CompetitionViewPage extends ConsumerWidget {
   final String competitionId;
@@ -32,30 +38,38 @@ class CompetitionViewPage extends ConsumerWidget {
           if (competition == null) {
             return const Center(child: Text('Competition not found'));
           }
+
           final statusLabel = switch (competition.status) {
             CompetitionStatus.upcoming => 'Upcoming',
             CompetitionStatus.active => 'Active',
             CompetitionStatus.ended => 'Past',
           };
+
           final participants = participantsAsync.maybeWhen(
             data: (value) => value,
             orElse: () => const [],
           );
-          final joined = uid != null && participants.any((p) => p.uid == uid);
 
+          final joined = uid != null && participants.any((p) => p.uid == uid);
           final activeAttempt = ref.watch(activeAttemptProvider(competitionId));
+          final routeLabel = (competition.routeName?.trim().isNotEmpty ?? false)
+          ? competition.routeName!
+          : competition.routeId;
+
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(padding16),
+            padding: const EdgeInsets.fromLTRB(padding16, padding12, padding16, padding24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoCard(
+                _InfoCardStyled(
                   competition: competition,
                   statusLabel: statusLabel,
                   participantCount: participants.length,
                 ),
-                const SizedBox(height: height16),
-                _JoinActions(
+
+                const SizedBox(height: height12),
+
+                _JoinButtonStyled(
                   joined: joined,
                   status: competition.status,
                   onJoin: () async {
@@ -85,8 +99,10 @@ class CompetitionViewPage extends ConsumerWidget {
                     }
                   },
                 ),
-                const SizedBox(height: height16),
-                _AttemptControls(
+
+                const SizedBox(height: height20),
+
+                _AttemptsStyled(
                   status: competition.status,
                   joined: joined,
                   activeAttempt: activeAttempt,
@@ -123,33 +139,55 @@ class CompetitionViewPage extends ConsumerWidget {
                     }
                   },
                 ),
-                const SizedBox(height: height24),
+
+                const SizedBox(height: height20),
+
                 const Text(
                   'Participants',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
+
                 participantsAsync.when(
-                  data: (items) => Column(
-                    children: items
-                        .map(
-                          (p) => ListTile(
-                            leading: const Icon(Icons.person_outline),
-                            title: Text(p.displayName ?? p.uid),
-                            subtitle: Text(p.uid),
+                  data: (items) {
+                    if (items.isEmpty) {
+                      return const _HintText('No participants yet');
+                    }
+                    return _PillList(
+                      children: items.map((p) {
+                        final title = (p.displayName?.trim().isNotEmpty ?? false)
+                            ? p.displayName!
+                            : p.uid;
+                        return PillNavRow(
+                          title: title,
+                          leading: SmartAvatar(
+                            src: p.photoUrl, // или p.img — как поле называется в твоей модели участника
+                            size: 28,
+                            placeholder: Container(
+                              color: surfaceColor,
+                              child: const Icon(Icons.person_outline, color: textHintColor, size: 18),
+                            ),
                           ),
-                        )
-                        .toList(),
-                  ),
+                          trailing: const Icon(Icons.chevron_right_rounded, color: textHintColor),
+                          onTap: null, // позже можно открыть профиль
+                        );
+                      }).toList(),
+                    );
+                  },
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Text('Failed to load participants: $e'),
                 ),
-                const SizedBox(height: height24),
+
+                const SizedBox(height: height20),
+
                 const Text(
                   'Leaderboard',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                 ),
                 const SizedBox(height: 8),
+
+                // если leaderboard_table у тебя уже красиво выглядит — ок.
+                // если нет — потом тоже подгоним.
                 LeaderboardTable(entries: leaderboard),
               ],
             ),
@@ -158,17 +196,18 @@ class CompetitionViewPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Failed to load competition: $e')),
       ),
-
     );
   }
 }
 
-class _InfoCard extends StatelessWidget {
+/// ---------------- Styled blocks ----------------
+
+class _InfoCardStyled extends StatelessWidget {
   final Competition competition;
   final String statusLabel;
   final int participantCount;
 
-  const _InfoCard({
+  const _InfoCardStyled({
     required this.competition,
     required this.statusLabel,
     required this.participantCount,
@@ -176,14 +215,18 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final routeTitle =
+    (competition.routeName?.trim().isNotEmpty ?? false)
+        ? competition.routeName!
+        : competition.routeId;
     return Container(
       padding: const EdgeInsets.all(padding16),
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(radius12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE6E6EA)),
       ),
-      child: 
-        Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -191,18 +234,24 @@ class _InfoCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   competition.name,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
               ),
-              Chip(label: Text(statusLabel)),
+              _StatusBadge(text: statusLabel),
             ],
           ),
 
-          const SizedBox(height: 8),
-          Text(competition.description),
-          const SizedBox(height: 8),
+          if (competition.description.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              competition.description,
+              style: const TextStyle(color: Colors.black87),
+            ),
+          ],
+
+          const SizedBox(height: 10),
           Text(
-            'Route: ${competition.routeId}',
+            'Route: $routeTitle',
             style: const TextStyle(color: textHintColor),
           ),
 
@@ -210,75 +259,99 @@ class _InfoCard extends StatelessWidget {
           Text(
             '${_formatDate(competition.startAt)} - ${_formatDate(competition.endAt)}',
             style: const TextStyle(color: textHintColor),
+          ),
 
-          ),
           const SizedBox(height: 4),
-          Text('Participants: $participantCount', style: const TextStyle(color: textHintColor)),
-          const SizedBox(height: 8),
-          const Text(
-            'Rules',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          Text(
+            'Participants: $participantCount',
+            style: const TextStyle(color: textHintColor),
           ),
-          Text(competition.rulesText, style: hintTextStyle.copyWith(color: Colors.black)),
+
+          const SizedBox(height: 12),
+          const Text('Rules', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(
+            competition.rulesText,
+            style: hintTextStyle.copyWith(color: Colors.black),
+          ),
         ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  static String _formatDate(DateTime date) {
+    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')} '
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }
 
-class _JoinActions extends StatelessWidget {
+class _StatusBadge extends StatelessWidget {
+  final String text;
+  const _StatusBadge({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F0FA), // мягкий лиловый как на скрине
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9CFEA)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class _JoinButtonStyled extends StatelessWidget {
   final bool joined;
   final CompetitionStatus status;
   final VoidCallback onJoin;
   final VoidCallback onLeave;
 
-  const _JoinActions({
+  const _JoinButtonStyled({
     required this.joined,
     required this.status,
     required this.onJoin,
     required this.onLeave,
   });
 
-   @override
+  @override
   Widget build(BuildContext context) {
     final isEnded = status == CompetitionStatus.ended;
+    final enabled = !isEnded;
 
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: isEnded
-                ? null
-                : joined
-                    ? onLeave
-                    : onJoin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: joined ? Colors.grey[300] : textHintColor,
-              foregroundColor: joined ? Colors.black87 : Colors.black,
-              elevation: 0,
-              
-            ),
-            child: Text(joined ? 'Leave competition' : 'Join competition'),
-          ),
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: !enabled ? null : (joined ? onLeave : onJoin),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFE6E6EA),
+          foregroundColor: Colors.black87,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
         ),
-      ]
+        child: Text(
+          joined ? 'Leave competition' : 'Join competition',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
     );
   }
 }
 
-class _AttemptControls extends StatelessWidget {
+class _AttemptsStyled extends StatelessWidget {
   final CompetitionStatus status;
   final bool joined;
   final CompetitionAttempt? activeAttempt;
   final VoidCallback onStart;
   final VoidCallback onFinish;
 
-
-  const _AttemptControls({
+  const _AttemptsStyled({
     required this.status,
     required this.joined,
     required this.activeAttempt,
@@ -291,51 +364,105 @@ class _AttemptControls extends StatelessWidget {
     if (!joined) return const SizedBox.shrink();
 
     final isActive = status == CompetitionStatus.active;
+    final canStart = isActive && activeAttempt == null;
+    final canFinish = isActive && activeAttempt != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Attempts',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-        ),
-        const SizedBox(height: 8),
+        const Text('Attempts', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        const SizedBox(height: 10),
+
         Row(
           children: [
             Expanded(
-              child: ElevatedButton(
-                onPressed: isActive && activeAttempt == null ? onStart : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.greenAccent,
-                  foregroundColor: Colors.black,
-                  elevation: 0,
-                ),
-                child: const Text('Start attempt'),
+              child: _PillButton(
+                label: 'Start attempt',
+                enabled: canStart,
+                onTap: onStart,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: ElevatedButton(
-                onPressed: isActive && activeAttempt != null ? onFinish : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orangeAccent,
-                  foregroundColor: Colors.black,
-                  elevation: 0,
-                ),
-                child: const Text('Finish'),
+              child: _PillButton(
+                label: 'Finish',
+                enabled: canFinish,
+                onTap: onFinish,
               ),
             ),
           ],
         ),
+
         if (!isActive)
           const Padding(
-            padding: EdgeInsets.only(top: 8),
+            padding: EdgeInsets.only(top: 10),
             child: Text(
               'Attempts are available only while competition is active.',
               style: TextStyle(color: textHintColor),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _PillButton({
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: ElevatedButton(
+        onPressed: enabled ? onTap : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFE6E6EA),
+          foregroundColor: Colors.black87,
+          disabledBackgroundColor: const Color(0xFFE6E6EA),
+          disabledForegroundColor: textHintColor,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+        ),
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+}
+
+class _PillList extends StatelessWidget {
+  final List<Widget> children;
+  const _PillList({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (int i = 0; i < children.length; i++) ...[
+          children[i],
+          if (i != children.length - 1) const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _HintText extends StatelessWidget {
+  final String text;
+  const _HintText(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Text(text, style: const TextStyle(color: textHintColor)),
     );
   }
 }

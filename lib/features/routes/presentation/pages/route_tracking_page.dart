@@ -186,50 +186,46 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
     super.dispose();
   }
 
-void _toggleFollowLeader() {
-  final leaderId = _leader.state.leaderId;
+  void _toggleFollowLeader() {
+    final leaderId = _leader.state.leaderId;
 
-  if (leaderId == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Leader is not defined for this group yet'),
-        backgroundColor: buttonBackgroundColor,
-      ),
-    );
-    return;
-  }
-
-  final enabled = _leader.toggleFollow();
-  setState(() {});
-
-  if (enabled) {
-    final lp = _leader.state.leaderPos;
-    if (lp != null) {
-      // ✅ СРАЗУ едем к лидеру, не ждём GPS тик
-      _updateCameraPosition(
-        target: lp,
-        bearing: _leader.state.leaderHeading ?? _progress.state.bearingDeg,
-      );
-    } else {
+    if (leaderId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Waiting for the leader location...'),
+          content: Text('Leader is not defined for this group yet'),
           backgroundColor: buttonBackgroundColor,
         ),
       );
+      return;
     }
-  } else {
-    // ✅ СРАЗУ возвращаемся к себе
-    final my = _progress.state.currentPos;
-    if (my != null) {
-      _updateCameraPosition(
-        target: my,
-        bearing: _progress.state.bearingDeg,
-      );
+
+    final enabled = _leader.toggleFollow();
+    setState(() {});
+
+    if (enabled) {
+      final lp = _leader.state.leaderPos;
+      if (lp != null) {
+        // ✅ СРАЗУ едем к лидеру, не ждём GPS тик
+        _updateCameraPosition(
+          target: lp,
+          bearing: _leader.state.leaderHeading ?? _progress.state.bearingDeg,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Waiting for the leader location...'),
+            backgroundColor: buttonBackgroundColor,
+          ),
+        );
+      }
+    } else {
+      // ✅ СРАЗУ возвращаемся к себе
+      final my = _progress.state.currentPos;
+      if (my != null) {
+        _updateCameraPosition(target: my, bearing: _progress.state.bearingDeg);
+      }
     }
   }
-}
-
 
   void _updateCameraPosition({LatLng? target, double? bearing}) {
     if (_controller == null) return;
@@ -300,41 +296,52 @@ void _toggleFollowLeader() {
     // ✅ ВАЖНО: traversed теперь “snap-to-route” как sublist,
     // а не GPS-ломаная. Тогда синяя линия не “пропадает кусками”.
     final st = _progress.state;
-    final traversedPoints = <LatLng>[];
-    if (widget.points.isNotEmpty &&
-        (st.started || widget.mode == TrackingMode.simulated)) {
-      final idx = st.closestIndex.clamp(0, widget.points.length - 1);
-      traversedPoints.addAll(widget.points.sublist(0, idx + 1));
-    }
-    
-    final started = st.started || widget.mode == TrackingMode.simulated;
-    final distToStart = st.distanceToStartM;
-    final elapsed = st.startTime == null ? Duration.zero : DateTime.now().difference(st.startTime!);
+
+final started = st.started; // ✅ только из контроллера
+final distToStart = st.distanceToStartM;
+
+final elapsed = (!started || st.startTime == null)
+    ? Duration.zero
+    : DateTime.now().difference(st.startTime!);
+
+// traversed polyline (зелёный)
+final traversedPoints = <LatLng>[];
+if (widget.points.isNotEmpty && started) {
+  final startIdx = st.startIndex.clamp(0, widget.points.length - 1);
+  final idx = st.closestIndex.clamp(startIdx, widget.points.length - 1);
+
+  if (idx > startIdx) {
+        traversedPoints.addAll(widget.points.sublist(startIdx, idx + 1));
+  } else if (startIdx < widget.points.length - 1) {
+    // показать маленький стартовый сегмент (иначе polyline не рисуется)
+    traversedPoints.addAll(widget.points.sublist(startIdx, startIdx + 2));
+  }
+}
     final isPaused = false; // пока заглушка, потом подключим
 
     final actions = <ActionButtonConfig>[
-  ActionButtonConfig(
-    label: 'Finish',
-    iconData: Icons.flag,
-    onTap: started ? _finishTracking : null,
-    filled: true,   // сделаем главной
-    enabled: started,
-  ),
-  ActionButtonConfig(
-    label: isPaused ? 'Resume' : 'Pause',
-    iconData: isPaused ? Icons.play_arrow : Icons.pause,
-    onTap: started ? _togglePause : null,
-    filled: false,
-    enabled: started,
-  ),
-  ActionButtonConfig(
-    label: 'Settings',
-    iconData: Icons.settings,
-    onTap: _openTrackingSettings,
-    filled: false,
-    enabled: true,
-  ),
-];
+      ActionButtonConfig(
+        label: 'Finish',
+        iconData: Icons.flag,
+        onTap: started ? _finishTracking : null,
+        filled: true, // сделаем главной
+        enabled: started,
+      ),
+      ActionButtonConfig(
+        label: isPaused ? 'Resume' : 'Pause',
+        iconData: isPaused ? Icons.play_arrow : Icons.pause,
+        onTap: started ? _togglePause : null,
+        filled: false,
+        enabled: started,
+      ),
+      ActionButtonConfig(
+        label: 'Settings',
+        iconData: Icons.settings,
+        onTap: _openTrackingSettings,
+        filled: false,
+        enabled: true,
+      ),
+    ];
 
     final traversedPolyline = Polyline(
       polylineId: const PolylineId('traversed'),
@@ -356,14 +363,14 @@ void _toggleFollowLeader() {
     final routeMarkers = buildRouteStartEndMarkers(points: widget.points);
     final liveMarkers = liveUsersAsync.when(
       data: (users) {
-          final now = DateTime.now().millisecondsSinceEpoch;
-          const ttlMs = 60 * 1000; // 30 секунд — норм
+        final now = DateTime.now().millisecondsSinceEpoch;
+        const ttlMs = 30 * 1000; // 30 секунд — норм
 
-          final online = users.where((u) {
-            final t = u.updatedAtMs;
-            if (t == null) return false;
-            return (now - t) <= ttlMs;
-          }).toList();
+        final online = users.where((u) {
+          final t = u.updatedAtMs;
+          if (t == null) return false;
+          return (now - t) <= ttlMs;
+        }).toList();
 
         return buildLiveMarkers(
           users: online,
@@ -397,14 +404,6 @@ void _toggleFollowLeader() {
             ),
           };
 
-    // --- start gate banner ---
-    //final distToStart = st.distanceToStartM;
-    // final showGateBanner =
-    //     widget.mode == TrackingMode.live &&
-    //     !st.started &&
-    //     distToStart != null &&
-    //     distToStart > RouteTrackingController.startRadiusM;
-
     return Scaffold(
       appBar: NewAppBar(
         title: "Route tracking",
@@ -434,79 +433,79 @@ void _toggleFollowLeader() {
               right: padding16,
               bottom: 140, // ← подбирается под + / − (можно 130–160)
               child: Tooltip(
-              message: _leader.state.followLeader
-                  ? 'Stop following leader'
-                  : 'Follow leader',                
-                child:  GestureDetector(
-                onTap: _toggleFollowLeader,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _leader.state.followLeader
-                        ? buttonBackgroundColor
-                        : Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 6,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    _leader.state.followLeader
-                        ? Icons.visibility_off
-                        : Icons.visibility,
-                    color: Colors.white,
-                    size: 24,
+                message: _leader.state.followLeader
+                    ? 'Stop following leader'
+                    : 'Follow leader',
+                child: GestureDetector(
+                  onTap: _toggleFollowLeader,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _leader.state.followLeader
+                          ? buttonBackgroundColor
+                          : Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      _leader.state.followLeader
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                   ),
                 ),
-              ),
               ),
             ),
           // start gate hint
           // if (showGateBanner)
-            Positioned(
-              left: padding16,
-              right: padding16,
-              top: padding12,
-              child: TrackingInfoBar(
-                started: started,
-                distToStartM: distToStart,
-                traversedMeters: st.traversedMeters,
-                remainingMeters: st.remainingMeters,
-                eta: st.eta,
-                elapsed: elapsed,
-              ),
+          Positioned(
+            left: padding16,
+            right: padding16,
+            top: padding12,
+            child: TrackingInfoBar(
+              started: started,
+              distToStartM: distToStart,
+              traversedMeters: st.traversedMeters,
+              remainingMeters: st.remainingMeters,
+              eta: st.eta,
+              elapsed: elapsed,
             ),
-Positioned(
-  left: 0,
-  right: 0,
-  bottom: 24,
-  child: RouteActionBar(actions: actions),
-),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 24,
+            child: RouteActionBar(actions: actions),
+          ),
         ],
       ),
     );
   }
 
   void _finishTracking() {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Finish pressed')),
-  );
-}
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Finish pressed')));
+  }
 
-void _togglePause() {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Pause/Resume pressed')),
-  );
-}
+  void _togglePause() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Pause/Resume pressed')));
+  }
 
-void _openTrackingSettings() {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Settings pressed')),
-  );
-}
+  void _openTrackingSettings() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Settings pressed')));
+  }
 }
