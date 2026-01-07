@@ -20,7 +20,7 @@ class FormFieldLabel extends StatelessWidget {
   }
 }
 
-InputDecoration competitionInputDecoration(String? hint) => InputDecoration(
+InputDecoration pillInputDecoration(String? hint) => InputDecoration(
       hintText: hint,
       hintStyle: hintTextStyle,
       isDense: true,
@@ -63,7 +63,7 @@ class PillTextField extends StatelessWidget {
         controller: controller,
         validator: validator,
         maxLines: 1,
-        decoration: competitionInputDecoration(hint)
+        decoration: pillInputDecoration(hint)
         ),
       );
   }

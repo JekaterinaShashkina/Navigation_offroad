@@ -64,8 +64,8 @@ class VehicleSelector extends StatelessWidget {
                     height: 28,
                     colorFilter: ColorFilter.mode(
                       isSelected
-                          ? Colors.black87   // выбранная — почти чёрная
-                          : const Color(0xFF9AA2AE), // невыбранные — серые
+                          ? textMainColor   // выбранная — почти чёрная
+                          : buttonSecondBackgroundColor, // невыбранные — серые
                       BlendMode.srcIn,
                     ),
                   ),
@@ -77,8 +77,8 @@ class VehicleSelector extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   color: isSelected
-                      ? buttonSecondBackgroundColor
-                      : textMainColor,
+                      ? textMainColor
+                      : buttonSecondBackgroundColor,
                 ),
               ),
             ],

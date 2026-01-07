@@ -6,13 +6,15 @@ class PillNavRow extends StatelessWidget {
   final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final String? subtitle;
 
   const PillNavRow({
     super.key,
     required this.title,
     this.leading,
     this.trailing,
-    this.onTap,
+    this.onTap, 
+    this.subtitle,
   });
 
   @override
@@ -44,6 +46,15 @@ class PillNavRow extends StatelessWidget {
                 ),
               ),
               trailing ?? const SizedBox.shrink(),
+              if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: textHintColor),
+              ),
+            ]
             ],
           ),
         ),

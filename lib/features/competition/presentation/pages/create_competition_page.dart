@@ -4,21 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
+import 'package:offroad_nav/design/widgets/pill_picker.dart';
 
 import 'package:offroad_nav/features/competition/data/repositories/competitions_repository.dart';
 import 'package:offroad_nav/features/competition/application/providers/competitions_providers.dart';
+import 'package:offroad_nav/features/competition/domain/config/competition_rules.dart';
+import 'package:offroad_nav/features/competition/presentation/pages/competition_rules_page.dart';
+import 'package:offroad_nav/features/competition/presentation/widgets/vehicle_selector.dart';
 
 import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
 import 'package:offroad_nav/features/routes/presentation/controller/routes_controller.dart';
 import 'package:offroad_nav/features/routes/presentation/pages/routes_list_page.dart';
 
 // твои виджеты/стили
-import 'package:offroad_nav/features/competition/presentation/widgets/pill_nav_row.dart';
-import 'package:offroad_nav/features/competition/presentation/widgets/competition_form_fields.dart';
+import 'package:offroad_nav/design/widgets/pill_nav_row.dart';
+import 'package:offroad_nav/design/widgets/form_fields_label.dart';
 import 'package:offroad_nav/features/competition/presentation/widgets/time_limit_picker.dart';
-
-// TODO: подключи свой vehicle selector (если он уже есть)
-// import 'package:offroad_nav/features/competition/presentation/widgets/vehicle_selector.dart';
 
 class CreateCompetitionPage extends ConsumerStatefulWidget {
   const CreateCompetitionPage({super.key});
@@ -31,7 +32,8 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
-  final _rulesCtrl = TextEditingController(text: 'Fastest time wins');
+  // final _rulesCtrl = TextEditingController(text: 'Fastest time wins');
+  CompetitionRule? _rule;
 
   RouteEntity? _route;
   DateTime? _startAt;
@@ -42,11 +44,13 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
 
   bool _saving = false;
 
+  String _vehicleTypeUi = 'ATV';
+
   @override
   void dispose() {
     _nameCtrl.dispose();
     _descriptionCtrl.dispose();
-    _rulesCtrl.dispose();
+    //_rulesCtrl.dispose();
     super.dispose();
   }
 
@@ -82,18 +86,35 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
                 TextFormField(
                   controller: _descriptionCtrl,
                   maxLines: 3,
-                  decoration: competitionInputDecoration('Lorem ipsum'),
+                  decoration: pillInputDecoration('Lorem ipsum'),
                 ),
                 const SizedBox(height: height16),
 
-                const FormFieldLabel('Rules'),
+                Row(
+                  children: [
+                    const FormFieldLabel('Rules'),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CompetitionRulesPage()),
+                        );
+                      },
+                      child: const Text('Rules'),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: _rulesCtrl,
-                  maxLines: 1,
-                  decoration: competitionInputDecoration('Fastest time wins').copyWith(
-                    suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded, color: textHintColor),
-                  ),
+                PillPicker<CompetitionRule>(
+                 // title: 'Select rule',
+                  placeholder: 'Select rule',
+                  items: competitionRules,
+                  selected: _rule,
+                  idOf: (r) => r.id,
+                  titleOf: (r) => r.title,
+                  subtitleOf: (r) => r.description, // ← опционально, но красиво
+                  onSelect: (r) => setState(() => _rule = r),
                 ),
                 const SizedBox(height: height16),
 
@@ -111,34 +132,16 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                PillBox(
-                  child: DropdownButtonFormField<RouteEntity>(
-                    value: _route,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: textHintColor),
-                    hint: const Text('Select route', style: TextStyle(color: textHintColor)),
-                    items: routesState.routes
-                        .map(
-                          (r) => DropdownMenuItem<RouteEntity>(
-                            value: r,
-                            child: Text(r.name, overflow: TextOverflow.ellipsis),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(() => _route = value),
-                    validator: (value) => value == null ? 'Select route' : null,
-                  ),
+                PillPicker<RouteEntity>(
+                  //label: '',
+                  placeholder: 'Select route',
+                  items: routesState.routes,
+                  selected: _route,
+                  titleOf: (r) => r.name,
+                  idOf: (r) => r.id,
+                  sheetTitle: 'Select route',
+                  onSelect: (r) => setState(() => _route = r),
                 ),
-                const SizedBox(height: height16),
-
                 // TIME (как в макете)
                 const FormFieldLabel('Time'),
                 const SizedBox(height: 8),
@@ -171,32 +174,23 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
 
                 const SizedBox(height: height16),
 
-                // CAR TYPE (место под твой selector)
-                const FormFieldLabel('Car type'),
-                const SizedBox(height: 8),
-                // ВСТАВЬ СВОЙ виджет выбора авто
-                // VehicleSelector(
-                //   value: _vehicleType,
-                //   onChanged: (v) => setState(() => _vehicleType = v),
-                // ),
-                PillNavRow(
-                  title: 'Select car type',
-                  trailing: const Icon(Icons.keyboard_arrow_down_rounded, color: textHintColor),
-                  onTap: () {
-                    // TODO: открыть твой selector / bottomsheet
-                  },
-                ),
+                  const FormFieldLabel('Car type'),
+                  const SizedBox(height: 8),
+
+                  VehicleSelector(
+                    selected: _vehicleTypeUi,
+                    onChanged: (v) => setState(() => _vehicleTypeUi = v),
+                  ),
 
                 const SizedBox(height: height24),
-
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
                     onPressed: _saving ? null : () => _submit(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
+                      backgroundColor: buttonBackgroundColor,
+                      foregroundColor: textMainColor,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                       elevation: 0,
                     ),
@@ -286,9 +280,10 @@ class _CreateCompetitionPageState extends ConsumerState<CreateCompetitionPage> {
       final input = CompetitionInput(
         name: _nameCtrl.text,
         description: _descriptionCtrl.text,
-        rulesText: _rulesCtrl.text,
+        rulesText: _rule!.title,
         routeId: _route!.id,
         routeName: _route!.name,
+        vehicleType: _vehicleTypeUi.toLowerCase(),
         startAt: _startAt!,
         endAt: _endAt!,
         // NOTE: если хочешь реально сохранять timeLimit —

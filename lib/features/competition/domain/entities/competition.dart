@@ -11,11 +11,11 @@ class Competition {
   final String routeId;
   final String? routeName;
   final DateTime startAt;
-    final DateTime endAt;
+  final DateTime endAt;
   final String createdBy;
   // final bool useLimit;
   // final int? limitMinutes; // храним сырые минуты, Duration можно посчитать геттером
-  // final String vehicle;    // 'ATV' | 'Jeep' | 'Truck'
+  final String? vehicleType;    // 'ATV' | 'Jeep' | 'Truck'
   // final String ownerId;
   // final String status;     // 'draft' | 'active' | 'completed' | etc.
 
@@ -31,7 +31,7 @@ class Competition {
     required this.createdBy,
     // required this.useLimit,
     // this.limitMinutes,
-    // required this.vehicle,
+    this.vehicleType,
     // required this.ownerId,
     // required this.status,
   });
@@ -52,6 +52,7 @@ class Competition {
       rulesText: (data['rulesText'] as String? ?? data['rule'] as String? ?? '').trim(),
       routeId: (data['routeId'] as String? ?? data['route_id'] as String? ?? '').trim(),
       routeName: (data['routeName'] as String?)?.trim(),
+      vehicleType: data['vehicleType'] as String?,
       startAt: (data['startAt'] as Timestamp?)?.toDate() ??
           (data['start_time'] as Timestamp?)?.toDate() ??
           DateTime.now(),
@@ -70,6 +71,7 @@ class Competition {
       'rulesText': rulesText,
       'routeId': routeId,
       'routeName': routeName,
+      'vehicleType': vehicleType,
       'startAt': Timestamp.fromDate(startAt),
       'endAt': Timestamp.fromDate(endAt),
       'createdBy': createdBy,

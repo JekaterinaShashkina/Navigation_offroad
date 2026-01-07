@@ -13,7 +13,7 @@ class CompetitionInput {
   final String routeName;
   final DateTime startAt;
   final DateTime endAt;
-  // final String vehicle;
+  final String? vehicleType;
 
   const CompetitionInput({
     required this.name,
@@ -23,7 +23,7 @@ class CompetitionInput {
     required this.routeName,
     required this.startAt,
     required this.endAt,
-    //required this.vehicle,
+    this.vehicleType,
   });
 }
 
@@ -77,6 +77,7 @@ class CompetitionsRepository {
       'rulesText': input.rulesText.trim(),
       'routeId': input.routeId,
       'routeName': input.routeName.trim(),
+      'vehicleType': input.vehicleType,
       'startAt': Timestamp.fromDate(input.startAt),
       'endAt': Timestamp.fromDate(input.endAt),
       'createdBy': uid,

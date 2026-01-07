@@ -6,6 +6,7 @@ import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
+import 'package:offroad_nav/design/widgets/app_button.dart';
 import 'package:offroad_nav/design/widgets/smart_avatar.dart';
 
 import 'package:offroad_nav/features/competition/application/providers/competitions_providers.dart';
@@ -14,7 +15,7 @@ import 'package:offroad_nav/features/competition/domain/entities/competition_att
 import 'package:offroad_nav/features/competition/presentation/widgets/leaderboard_table.dart';
 
 // твои pill-компоненты
-import 'package:offroad_nav/features/competition/presentation/widgets/pill_nav_row.dart';
+import 'package:offroad_nav/design/widgets/pill_nav_row.dart';
 
 class CompetitionViewPage extends ConsumerWidget {
   final String competitionId;
@@ -69,7 +70,7 @@ class CompetitionViewPage extends ConsumerWidget {
 
                 const SizedBox(height: height12),
 
-                _JoinButtonStyled(
+                _JoinActions(
                   joined: joined,
                   status: competition.status,
                   onJoin: () async {
@@ -102,7 +103,7 @@ class CompetitionViewPage extends ConsumerWidget {
 
                 const SizedBox(height: height20),
 
-                _AttemptsStyled(
+                _AttemptsControls(
                   status: competition.status,
                   joined: joined,
                   activeAttempt: activeAttempt,
@@ -219,6 +220,12 @@ class _InfoCardStyled extends StatelessWidget {
     (competition.routeName?.trim().isNotEmpty ?? false)
         ? competition.routeName!
         : competition.routeId;
+    final vehicleLabel = switch ((competition.vehicleType ?? '').toLowerCase()) {
+      'atv' => 'ATV',
+      'jeep' => 'Jeep',
+      'truck' => 'Truck',
+      _ => '—',
+    };
     return Container(
       padding: const EdgeInsets.all(padding16),
       decoration: BoxDecoration(
@@ -262,6 +269,11 @@ class _InfoCardStyled extends StatelessWidget {
           ),
 
           const SizedBox(height: 4),
+          Row(
+            children: [
+              _InfoPill(label: 'Car: $vehicleLabel'),
+            ],
+          ),
           Text(
             'Participants: $participantCount',
             style: const TextStyle(color: textHintColor),
@@ -306,13 +318,13 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _JoinButtonStyled extends StatelessWidget {
+class _JoinActions extends StatelessWidget {
   final bool joined;
   final CompetitionStatus status;
   final VoidCallback onJoin;
   final VoidCallback onLeave;
 
-  const _JoinButtonStyled({
+  const _JoinActions({
     required this.joined,
     required this.status,
     required this.onJoin,
@@ -322,36 +334,23 @@ class _JoinButtonStyled extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isEnded = status == CompetitionStatus.ended;
-    final enabled = !isEnded;
 
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: !enabled ? null : (joined ? onLeave : onJoin),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE6E6EA),
-          foregroundColor: Colors.black87,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-        ),
-        child: Text(
-          joined ? 'Leave competition' : 'Join competition',
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
+    return AppButton(
+      text: joined ? 'Leave competition' : 'Join competition',
+      onPressed: isEnded ? null : (joined ? onLeave : onJoin),
+      secondaryBackground: joined, // joined -> secondary style
     );
   }
 }
 
-class _AttemptsStyled extends StatelessWidget {
+class _AttemptsControls extends StatelessWidget {
   final CompetitionStatus status;
   final bool joined;
   final CompetitionAttempt? activeAttempt;
   final VoidCallback onStart;
   final VoidCallback onFinish;
 
-  const _AttemptsStyled({
+  const _AttemptsControls({
     required this.status,
     required this.joined,
     required this.activeAttempt,
@@ -376,18 +375,18 @@ class _AttemptsStyled extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _PillButton(
-                label: 'Start attempt',
-                enabled: canStart,
-                onTap: onStart,
+              child: AppButton(
+                text: 'Start attempt',
+                onPressed: canStart ? onStart : null,
+                secondaryBackground: false, // primary
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _PillButton(
-                label: 'Finish',
-                enabled: canFinish,
-                onTap: onFinish,
+              child: AppButton(
+                text: 'Finish',
+                onPressed: canFinish ? onFinish : null,
+                secondaryBackground: true, // secondary (чтобы отличалась)
               ),
             ),
           ],
@@ -406,36 +405,36 @@ class _AttemptsStyled extends StatelessWidget {
   }
 }
 
-class _PillButton extends StatelessWidget {
-  final String label;
-  final bool enabled;
-  final VoidCallback onTap;
+  // class _PillButton extends StatelessWidget {
+  //   final String label;
+  //   final bool enabled;
+  //   final VoidCallback onTap;
 
-  const _PillButton({
-    required this.label,
-    required this.enabled,
-    required this.onTap,
-  });
+  //   const _PillButton({
+  //     required this.label,
+  //     required this.enabled,
+  //     required this.onTap,
+  //   });
 
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 46,
-      child: ElevatedButton(
-        onPressed: enabled ? onTap : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE6E6EA),
-          foregroundColor: Colors.black87,
-          disabledBackgroundColor: const Color(0xFFE6E6EA),
-          disabledForegroundColor: textHintColor,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-        ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
-}
+  //   @override
+  //   Widget build(BuildContext context) {
+  //     return SizedBox(
+  //       height: 46,
+  //       child: ElevatedButton(
+  //         onPressed: enabled ? onTap : null,
+  //         style: ElevatedButton.styleFrom(
+  //           backgroundColor: const Color(0xFFE6E6EA),
+  //           foregroundColor: Colors.black87,
+  //           disabledBackgroundColor: const Color(0xFFE6E6EA),
+  //           disabledForegroundColor: textHintColor,
+  //           elevation: 0,
+  //           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+  //         ),
+  //         child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+  //       ),
+  //     );
+  //   }
+  // }
 
 class _PillList extends StatelessWidget {
   final List<Widget> children;
@@ -463,6 +462,27 @@ class _HintText extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Text(text, style: const TextStyle(color: textHintColor)),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  final String label;
+  const _InfoPill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F0FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9CFEA)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
     );
   }
 }
