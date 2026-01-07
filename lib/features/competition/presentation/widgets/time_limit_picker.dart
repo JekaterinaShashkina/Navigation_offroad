@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
-import 'competition_form_fields.dart'; // если тут лежит PillBox
+import '../../../../design/widgets/form_fields_label.dart'; // если тут лежит PillBox
 
 class TimeLimitPicker extends StatelessWidget {
   final Duration value;

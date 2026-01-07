@@ -7,7 +7,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_svg/flutter_svg.dart' as svg; // SvgStringLoader, PictureInfo
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/painting.dart' show applyBoxFit, BoxFit, FittedSizes;
+// import 'package:flutter/painting.dart' show applyBoxFit, BoxFit;
 
 /// Делает круглые маркеры-аватары для GoogleMap и кеширует их.
 /// Использование:

@@ -53,9 +53,6 @@ class CompetitionViewPage extends ConsumerWidget {
 
           final joined = uid != null && participants.any((p) => p.uid == uid);
           final activeAttempt = ref.watch(activeAttemptProvider(competitionId));
-          final routeLabel = (competition.routeName?.trim().isNotEmpty ?? false)
-          ? competition.routeName!
-          : competition.routeId;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(padding16, padding12, padding16, padding24),

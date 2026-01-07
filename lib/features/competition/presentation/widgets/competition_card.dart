@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/styles.dart';
+// import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/features/competition/domain/entities/competition.dart';
 
 class CompetitionCard extends StatelessWidget {
@@ -80,19 +80,6 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color color;
-    switch (status) {
-      case CompetitionStatus.upcoming:
-        color = Colors.blueAccent;
-        break;
-      case CompetitionStatus.active:
-        color = Colors.green;
-        break;
-      case CompetitionStatus.ended:
-        color = Colors.grey;
-        break;
-    }
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
