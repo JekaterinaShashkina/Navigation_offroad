@@ -429,3 +429,4 @@ final SvgPicture locationArrow = SvgPicture.asset(
 const motoIconPath  = 'assets/images/moto_icon.svg';
 const jeepIconPath  = 'assets/images/Jeep_icon.svg';
 const truckIconPath = 'assets/images/small_truck_icon.svg';
+const manIconPath = 'assets/images/walk_man_icon.svg';

@@ -86,6 +86,55 @@ class _RoutePlannerController {
     }
   }
 
+    /// Линейная интерполяция LatLng (для небольших расстояний нормально).
+  LatLng _lerp(LatLng a, LatLng b, double t) {
+    return LatLng(
+      a.latitude + (b.latitude - a.latitude) * t,
+      a.longitude + (b.longitude - a.longitude) * t,
+    );
+  }
+
+  /// Делает "плотную" полилинию: добавляет промежуточные точки каждые stepMeters.
+  /// Важно: возвращает уже с учетом closed (если замкнуто — последний сегмент к первой).
+  List<LatLng> buildDensePolyline({double stepMeters = 10.0}) {
+    final src = polylinePoints; // уже с учетом closed (первая в конце)
+    if (src.length < 2) return List<LatLng>.from(src);
+
+    final out = <LatLng>[];
+    out.add(src.first);
+
+    for (int i = 0; i + 1 < src.length; i++) {
+      final a = src[i];
+      final b = src[i + 1];
+      final d = _distanceMeters(a, b);
+
+      if (d <= stepMeters) {
+        out.add(b);
+        continue;
+      }
+
+      final parts = (d / stepMeters).floor();
+      for (int k = 1; k <= parts; k++) {
+        final t = (k * stepMeters) / d;
+        if (t >= 1.0) break;
+        out.add(_lerp(a, b, t));
+      }
+      out.add(b);
+    }
+
+    return out;
+  }
+
+  /// Длина по произвольному списку точек (км)
+  double lengthKmOf(List<LatLng> pts) {
+    if (pts.length < 2) return 0;
+    double s = 0;
+    for (int i = 0; i + 1 < pts.length; i++) {
+      s += _distKm(pts[i], pts[i + 1]);
+    }
+    return double.parse(s.toStringAsFixed(3));
+  }
+
   void removePoint(int index) {
     if (index < 0 || index >= _points.length) return;
     _points.removeAt(index);
@@ -179,6 +228,19 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
 
   Future<void> _save() async {
     final points = _controllerLogic.points;
+        // 1) исходные точки (waypoints)
+    final waypoints = points
+        .map((p) => {'lat': p.latitude, 'lng': p.longitude})
+        .toList();
+
+    // 2) плотный трек для прохождения
+    // шаг можно выбрать: пешком 5–8м, машина 10–20м
+    final dense = _controllerLogic.buildDensePolyline(stepMeters: 10.0);
+    final trackPoints = dense
+        .map((p) => {'lat': p.latitude, 'lng': p.longitude})
+        .toList();
+
+    final lengthKm = _controllerLogic.lengthKmOf(dense);
     if (points.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Add at least two points')),
@@ -211,18 +273,22 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final pts = _controllerLogic.polylinePoints
-        .map((p) => {'lat': p.latitude, 'lng': p.longitude})
-        .toList();
-
     await FirebaseFirestore.instance.collection('routes').add({
       'userId': uid,
       'name': name,
-      'points': pts,
-      'lengthKm': _controllerLogic.totalKm,
+
+      // points = плотный трек (важно!)
+      'points': trackPoints,
+
+      // сохраняем исходные клики отдельно
+      'waypoints': waypoints,
+
+      'lengthKm': lengthKm,
       'createdAt': DateTime.now(),
       'isPrivate': true,
       'closed': _controllerLogic.closed,
+      'source': 'planner',
+      'stepMeters': 10.0,
     });
 
     if (!mounted) return;

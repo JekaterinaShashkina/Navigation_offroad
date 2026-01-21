@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:offroad_nav/features/auth/presentation/pages/splash_page.dart';
 
 import 'firebase_options.dart';
 
 // AUTH / ONBOARDING
-import 'features/auth/presentation/pages/splash_page.dart';
 import 'features/auth/presentation/pages/welcome_page.dart';
 import 'features/auth/presentation/pages/welcome_login_page.dart';
 import 'features/auth/presentation/pages/login_page.dart';

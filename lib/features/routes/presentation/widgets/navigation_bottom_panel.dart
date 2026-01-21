@@ -5,15 +5,17 @@ import 'package:offroad_nav/design/dimension.dart';
 class NavigationBottomPanel extends StatelessWidget {
   final String timeText;
   final String distanceText;
-  final VoidCallback onGo;
+  final VoidCallback? onGo;
   final VoidCallback onClose;
+  final bool showPrimaryButton;
 
   const NavigationBottomPanel({
     super.key,
     required this.timeText,
     required this.distanceText,
-    required this.onGo,
+    this.onGo,
     required this.onClose,
+    this.showPrimaryButton = true,
   });
 
   @override
@@ -75,17 +77,17 @@ class NavigationBottomPanel extends StatelessWidget {
             ),
             ),
           ),
-
-          ElevatedButton(
-            onPressed: onGo,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: chipBgColor,
-              foregroundColor: textMainColor,
-              shape: const CircleBorder(),
-              padding: const EdgeInsets.all(18),
-            ),
-            child: const Text("GO"),
-          )
+          if (showPrimaryButton)
+            ElevatedButton(
+              onPressed: onGo,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: chipBgColor,
+                foregroundColor: textMainColor,
+                shape: const CircleBorder(),
+                padding: const EdgeInsets.all(18),
+              ),
+              child: const Text("GO"),
+            )
         ],
       ),
     );

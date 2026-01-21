@@ -1,5 +1,6 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../utils/route_math.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/settings/tracking_profile.dart';
+import '../../utils/route_math.dart';
 
 class RouteProgressState {
   final bool started;
@@ -84,7 +85,7 @@ class RouteTrackingController {
   static const double onRouteThresholdM = 60;
 
   // Ограничение продвижения по индексу за тик
-  static const int maxJumpPoints = 1;
+  static const int maxJumpPoints = 5;
 
   // Ограничение продвижения по расстоянию за тик
   static const double maxJumpMeters = 300;
@@ -124,17 +125,55 @@ class RouteTrackingController {
   return best;
 }
 
+SegmentSnap closestSegmentWindow(
+    List<LatLng> route,
+    LatLng pos,
+    int centerIdx,
+  ) {
+    const int window = 40; // можно 40-80 для авто
+    final int start = (centerIdx - window).clamp(0, route.length - 2).toInt();
+    final int end   = (centerIdx + window).clamp(0, route.length - 2).toInt();
+
+    SegmentSnap? best;
+    for (int i = start; i <= end; i++) {
+      final snap = snapToSegmentMeters(
+        pos: pos,
+        a: route[i],
+        b: route[i + 1],
+        segIndex: i,
+      );
+      if (best == null || snap.distToRouteM < best.distToRouteM) {
+        best = snap;
+      }
+    }
+    return best ?? const SegmentSnap(0, 0, double.infinity);
+  }
 
   void updatePosition({
     required List<LatLng> route,
     required LatLng pos,
     required double bearingDeg,
-    required bool isLiveMode,
+    required TrackingProfile profile,
+    // required bool isLiveMode,
   }) {
     if (route.isEmpty) return;
 
     bool started = _state.started;
     DateTime? startTime = _state.startTime;
+
+    final int maxPts = switch (profile) {
+    TrackingProfile.walk => 5,
+    TrackingProfile.moto => 10,
+    TrackingProfile.auto => 12,
+    _ => 6,
+  };     // 12*10м = 120м за тик
+    final double maxM = switch (profile) {
+    TrackingProfile.walk => 300.0,
+    TrackingProfile.moto => 500.0,
+    TrackingProfile.auto => 700.0,
+    _ => 350.0,
+  }; // на авто бывает “рывок” GPS
+
 
     // 1) До старта — считаем расстояние до start point
     double? distToStartM = started ? null : distanceM(pos, route.first);
@@ -179,26 +218,34 @@ class RouteTrackingController {
     final prev = _state.maxIndexReached;
     final safePrev = prev.clamp(0, route.length - 1);
 
-    final center = safePrev > 0 ? safePrev : _state.startIndex.clamp(0, route.length - 1);
-    final rawIdx = closestPointIndexWindow(route, pos, center);
+final center = safePrev > 0
+    ? safePrev
+    : _state.startIndex.clamp(0, route.length - 2);
 
-    // 4) Фильтр: если мы далеко от маршрута — не двигаем прогресс (убирает телепорты)
-    final distToRoute = distanceM(pos, route[rawIdx]);
-    int idx = safePrev;
+// ✅ ищем ближайший сегмент и проекцию на него
+final snap = closestSegmentWindow(route, pos, center);
 
-    if (distToRoute <= onRouteThresholdM) {
-      // монотонно (не назад)
-      idx = rawIdx < safePrev ? safePrev : rawIdx;
+// превращаем сегмент+т в “индекс прогресса”
+final rawIdx = (snap.segIndex + (snap.t >= 0.5 ? 1 : 0))
+    .clamp(0, route.length - 1);
 
-      // ограничение скачка по точкам
-      if (idx - safePrev > maxJumpPoints) idx = safePrev + maxJumpPoints;
+final distToRoute = snap.distToRouteM;
 
-      // ограничение скачка по метрам
-      final jumpM = distanceM(route[safePrev], route[idx]);
-      if (jumpM > maxJumpMeters) {
-        idx = safePrev; // слишком большой прыжок — игнорируем этот тик
-      }
-    }
+int idx = safePrev;
+
+if (distToRoute <= onRouteThresholdM) {
+  // монотонно (не назад)
+  idx = rawIdx < safePrev ? safePrev : rawIdx;
+
+  // ограничение скачка по точкам
+  if (idx - safePrev > maxPts) idx = safePrev + maxPts;
+
+  // ограничение скачка по метрам
+  final jumpM = distanceM(route[safePrev], route[idx]);
+  if (jumpM > maxM) {
+    idx = safePrev;
+  }
+}
 
     // 5) remaining по маршруту
     double remaining = 0;

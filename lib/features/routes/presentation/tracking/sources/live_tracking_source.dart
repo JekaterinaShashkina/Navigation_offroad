@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/settings/tracking_profile.dart';
 import 'package:offroad_nav/features/routes/presentation/utils/route_math.dart';
 
 import 'tracking_sample.dart';
@@ -15,10 +16,10 @@ class LiveTrackingSource implements ITrackingSource {
     this.requireStartWithinM = 20, // 10–20м обычно норм
   }) : _loc = location ?? Location();
 
+  DateTime? _prevAt;
   final Location _loc;
   final double accMaxM;
   final double maxJumpM;
-  
 
   final LatLng? startPoint;
   final double requireStartWithinM;
@@ -52,60 +53,78 @@ class LiveTrackingSource implements ITrackingSource {
     }
     if (perm != PermissionStatus.granted) return;
 
-    await _loc.changeSettings(
-      accuracy: LocationAccuracy.high,
-      interval: 1000,
-      distanceFilter: 6,
-    );
-
-        // опционально: проверим текущую позицию один раз до подписки
-    try {
-      final first = await _loc.getLocation();
-      if (first.latitude != null && first.longitude != null) {
-        _prev = LatLng(first.latitude!, first.longitude!);
-      }
-    } catch (_) {}
-
+    await applyProfile(_profile);
 
     _sub = _loc.onLocationChanged.listen((loc) {
       if (loc.latitude == null || loc.longitude == null) return;
 
-      if (loc.accuracy != null && loc.accuracy! > accMaxM) return;
+      // На авто accuracy иногда 10-60м, 35 может быть жестко — можно поднять
+      if (loc.accuracy != null && loc.accuracy! > 60) return;
 
       final cur = LatLng(loc.latitude!, loc.longitude!);
 
-      // NEW: "подойти к старту" — gate
-      if (!_startGatePassed && startPoint != null) {
-        // final d = distanceM(cur, startPoint!);
-          _startGatePassed = true;
-          // сброс prev чтобы не было резкого bearing
-          _prev = cur;
-        
+      // jump filter (adaptive)
+      final now = DateTime.now();
+      if (_prev != null && _prevAt != null) {
+        final dt = now.difference(_prevAt!).inMilliseconds / 1000.0;
+        final jump = distanceM(_prev!, cur);
+        final allowed = (50.0 * dt) + 20.0; // 180 км/ч + запас
+        if (jump > allowed) return;
       }
 
-      // jump filter
-      if (_prev != null) {
-        final jump = distanceM(_prev!, cur);
-        if (jump > maxJumpM) return;
-      }
-      // bearing + smoothing
       final raw = _prev == null ? _bearingSmoothed : bearingDeg(_prev!, cur);
       _bearingSmoothed = lerpAngle(_bearingSmoothed, raw, 0.25);
-      final bearing = _bearingSmoothed;
 
       _prev = cur;
+      _prevAt = now;
 
       _ctrl.add(
         TrackSample(
           pos: cur,
-          bearingDeg: bearing,
+          bearingDeg: _bearingSmoothed,
           accuracyM: loc.accuracy?.toDouble(),
         ),
       );
     });
   }
 
-@override
+  TrackingProfile _profile = TrackingProfile.def;
+
+Future<void> applyProfile(TrackingProfile p) async {
+  _profile = p;
+
+  // Если Auto — стартуем как walk, а дальше можно (опционально) авто-переключать по speed.
+  if (p == TrackingProfile.walk) {
+    await _loc.changeSettings(
+      accuracy: LocationAccuracy.high,
+      interval: 1000,
+      distanceFilter: 3,
+    );
+    
+  } else if (p == TrackingProfile.moto) {
+    await _loc.changeSettings(
+      accuracy: LocationAccuracy.navigation,
+      interval: 650,
+      distanceFilter: 2,
+    );
+  } else if (p == TrackingProfile.auto) {
+    await _loc.changeSettings(
+      accuracy: LocationAccuracy.navigation,
+      interval: 500,
+      distanceFilter: 2,
+    );
+  } else {
+    // Auto — компромиссный базовый режим
+    await _loc.changeSettings(
+      accuracy: LocationAccuracy.high,
+      interval: 1000,
+      distanceFilter: 3,
+    );
+  }
+}
+
+
+  @override
   Future<void> dispose() async {
     await _sub?.cancel();
     _sub = null;

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,25 +10,26 @@ import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/avatar_marker_factory.dart';
 import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
 import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
+import 'package:offroad_nav/features/routes/data/repositories/completed_route_repository.dart';
 import 'package:offroad_nav/features/routes/presentation/map/live_markers_builder.dart';
 import 'package:offroad_nav/features/routes/presentation/map/map_icons_loader.dart';
 import 'package:offroad_nav/features/routes/presentation/map/route_markers_builder.dart';
-import 'package:offroad_nav/features/routes/presentation/tracking/tracking_presence_service.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/services/tracking_presence_service.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/settings/tracking_profile.dart';
+import 'package:offroad_nav/features/routes/presentation/tracking/settings/tracking_settings_sheet.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/route_action_bar.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/tracking_bottom_controls.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/tracking_bottom_panel.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/tracking_infobar.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../design/widgets/app_bar.dart';
-import '../tracking/live_tracking_source.dart';
-import '../tracking/sim_tracking_source.dart';
-import '../tracking/tracking_sample.dart';
-import '../tracking/tracking_source.dart';
+import '../tracking/sources/live_tracking_source.dart';
+import '../tracking/sources/sim_tracking_source.dart';
+import '../tracking/sources/tracking_sample.dart';
+import '../tracking/sources/tracking_source.dart';
 
 // ✅ новые маленькие контроллеры (которые мы договорились вынести)
-import '../tracking/leader_follow_controller.dart';
-import '../tracking/route_tracking_controller.dart';
+import '../tracking/controllers/leader_follow_controller.dart';
+import '../tracking/controllers/route_tracking_controller.dart';
 
 // ✅ UI панели
 
@@ -40,9 +42,15 @@ class RouteTrackingPage extends ConsumerStatefulWidget {
   /// Если null — одиночный режим (без live-участников).
   final String? groupId;
 
+  final String? routeId;
+  final String routeName;
+
+
   const RouteTrackingPage({
     super.key,
     required this.points,
+    required this.routeName,
+    this.routeId,
     this.mode = TrackingMode.simulated,
     this.groupId,
   });
@@ -80,10 +88,12 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
 
   DateTime? _lastCameraMoveAt;
 
+  late final CompletedRouteRepository _completedRepo;
+
   @override
   void initState() {
     super.initState();
-
+    _completedRepo = CompletedRouteRepository(FirebaseFirestore.instance);
     _uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
 
     _source = widget.mode == TrackingMode.simulated
@@ -127,12 +137,13 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
     _sub = _source.watch().listen((s) async {
       if (!mounted) return;
 
+      final currentProfile = ref.read(trackingProfileProvider);
       // обновляем прогресс — ТОЛЬКО по своей позиции (s.pos)
       _progress.updatePosition(
         route: widget.points,
         pos: s.pos,
         bearingDeg: s.bearingDeg,
-        isLiveMode: widget.mode == TrackingMode.live,
+        profile: currentProfile,
       );
 
       // камера: если follow включён и есть лидерская позиция — следуем за лидером
@@ -297,26 +308,26 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
     // а не GPS-ломаная. Тогда синяя линия не “пропадает кусками”.
     final st = _progress.state;
 
-final started = st.started; // ✅ только из контроллера
-final distToStart = st.distanceToStartM;
+    final started = st.started; // ✅ только из контроллера
+    final distToStart = st.distanceToStartM;
 
-final elapsed = (!started || st.startTime == null)
-    ? Duration.zero
-    : DateTime.now().difference(st.startTime!);
+    final elapsed = (!started || st.startTime == null)
+        ? Duration.zero
+        : DateTime.now().difference(st.startTime!);
 
-// traversed polyline (зелёный)
-final traversedPoints = <LatLng>[];
-if (widget.points.isNotEmpty && started) {
-  final startIdx = st.startIndex.clamp(0, widget.points.length - 1);
-  final idx = st.closestIndex.clamp(startIdx, widget.points.length - 1);
+    // traversed polyline (зелёный)
+    final traversedPoints = <LatLng>[];
+    if (widget.points.isNotEmpty && started) {
+      final startIdx = st.startIndex.clamp(0, widget.points.length - 1);
+      final idx = st.closestIndex.clamp(startIdx, widget.points.length - 1);
 
-  if (idx > startIdx) {
+      if (idx > startIdx) {
         traversedPoints.addAll(widget.points.sublist(startIdx, idx + 1));
-  } else if (startIdx < widget.points.length - 1) {
-    // показать маленький стартовый сегмент (иначе polyline не рисуется)
-    traversedPoints.addAll(widget.points.sublist(startIdx, startIdx + 2));
-  }
-}
+      } else if (startIdx < widget.points.length - 1) {
+        // показать маленький стартовый сегмент (иначе polyline не рисуется)
+        traversedPoints.addAll(widget.points.sublist(startIdx, startIdx + 2));
+      }
+    }
     final isPaused = false; // пока заглушка, потом подключим
 
     final actions = <ActionButtonConfig>[
@@ -491,10 +502,59 @@ if (widget.points.isNotEmpty && started) {
     );
   }
 
-  void _finishTracking() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Finish pressed')));
+  Future<void> _finishTracking() async {
+    final st = _progress.state;
+
+    if (!st.started || st.startTime == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('You have not started yet')));
+      return;
+    }
+
+    final finishedAt = DateTime.now();
+    final startedAt = st.startTime!;
+
+    final profile = ref.read(trackingProfileProvider);
+
+    final startIdx = st.startIndex.clamp(0, widget.points.length - 1);
+    final endIdx = st.closestIndex.clamp(startIdx, widget.points.length - 1);
+
+    final distanceM = st.traversedMeters;
+
+    final traversed = (endIdx > startIdx)
+        ? widget.points.sublist(startIdx, endIdx + 1)
+        : <LatLng>[];
+
+    try {
+      await _completedRepo.saveCompletedRoute(
+        userId: _uid,
+        profileName: profile.name,
+        startedAt: startedAt,
+        finishedAt: finishedAt,
+        distanceMeters: distanceM,
+        startIndex: startIdx,
+        endIndex: endIdx,
+        traversedPolyline: traversed, // можно убрать вообще, если не нужно
+        mode: widget.groupId == null ? 'solo' : 'group',
+        groupId: widget.groupId,
+        routeId: widget.routeId,  // ✅ можно не писать (если optional) 
+        routeName: widget.routeName,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Route saved')));
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+    }
   }
 
   void _togglePause() {
@@ -504,8 +564,21 @@ if (widget.points.isNotEmpty && started) {
   }
 
   void _openTrackingSettings() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Settings pressed')));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => TrackingSettingsSheet(
+        onApplyProfile: (p) async {
+        // обновляем выбранный профиль в приложении
+        ref.read(trackingProfileProvider.notifier).set(p);
+
+        // применяем настройки GPS только если это live
+        if (widget.mode == TrackingMode.live && _source is LiveTrackingSource) {
+          await (_source as LiveTrackingSource).applyProfile(p);
+        }
+        },
+      ),
+    );
   }
 }

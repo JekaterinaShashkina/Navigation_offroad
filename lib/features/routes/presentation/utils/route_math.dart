@@ -67,3 +67,58 @@ double pathLengthKm(List<LatLng> points) {
   }
   return sum;
 }
+
+class SegmentSnap {
+  final int segIndex;        // индекс сегмента [i -> i+1]
+  final double t;            // 0..1, где проекция лежит на сегменте
+  final double distToRouteM; // расстояние от pos до сегмента
+  const SegmentSnap(this.segIndex, this.t, this.distToRouteM);
+}
+
+/// Быстрое приближение: LatLng -> локальные метры (equirectangular)
+class _XY {
+  final double x;
+  final double y;
+  const _XY(this.x, this.y);
+}
+
+_XY _toXY(LatLng p, double lat0Rad) {
+  const R = 6371000.0;
+  final lat = p.latitude * math.pi / 180.0;
+  final lng = p.longitude * math.pi / 180.0;
+  final x = R * (lng) * math.cos(lat0Rad);
+  final y = R * (lat);
+  return _XY(x, y);
+}
+
+/// Расстояние от точки pos до сегмента [a-b] + параметр проекции t (0..1)
+SegmentSnap snapToSegmentMeters({
+  required LatLng pos,
+  required LatLng a,
+  required LatLng b,
+  required int segIndex,
+}) {
+  final lat0Rad = (pos.latitude * math.pi / 180.0);
+
+  final p = _toXY(pos, lat0Rad);
+  final A = _toXY(a, lat0Rad);
+  final B = _toXY(b, lat0Rad);
+
+  final vx = B.x - A.x;
+  final vy = B.y - A.y;
+  final wx = p.x - A.x;
+  final wy = p.y - A.y;
+
+  final vv = vx * vx + vy * vy;
+  double t = vv == 0 ? 0.0 : (wx * vx + wy * vy) / vv;
+  t = t.clamp(0.0, 1.0);
+
+  final projX = A.x + t * vx;
+  final projY = A.y + t * vy;
+
+  final dx = p.x - projX;
+  final dy = p.y - projY;
+
+  final dist = math.sqrt(dx * dx + dy * dy);
+  return SegmentSnap(segIndex, t, dist);
+}

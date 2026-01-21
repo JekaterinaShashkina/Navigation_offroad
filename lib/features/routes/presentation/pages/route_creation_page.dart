@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../design/images.dart';
-import '../tracking/tracker_controller.dart';
+import '../tracking/controllers/tracker_controller.dart';
 import '../../../../design/widgets/app_bar.dart';
 import '../utils/marker_icon.dart';
 import '../utils/route_math.dart';

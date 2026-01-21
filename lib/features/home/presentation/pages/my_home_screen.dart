@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/features/home/presentation/widgets/profile_avatar_button.dart';
-import 'package:offroad_nav/design/widgets/route_search_widget.dart';
+import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
+import 'package:offroad_nav/features/friends/presentation/pages/my_friends_page.dart';
+import 'package:offroad_nav/features/home/presentation/notifications/pending_invites_snackbar.dart';
+import 'package:offroad_nav/features/home/presentation/widgets/map_top_bar.dart';
 
 class MyHomeScreen extends StatefulWidget {
   const MyHomeScreen({super.key});
@@ -20,10 +23,23 @@ class _MyHomeScreenState extends State<MyHomeScreen> {
     zoom: 7,
   );
 
+  late final PendingInvitesSnackbarController _pendingSnack;
+
+@override
+void initState() {
+  super.initState();
+  _pendingSnack = PendingInvitesSnackbarController();
+  _pendingSnack.start(context);
+}
+  @override
+  void dispose() {
+    _pendingSnack.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-
-   // final user = FirebaseAuth.instance.currentUser;
+    // final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       body: Stack(
@@ -35,33 +51,7 @@ class _MyHomeScreenState extends State<MyHomeScreen> {
             onMapCreated: (controller) => _controller.complete(controller),
           ),
           // Белая панель с аватаркой
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 135,
-              color: surfaceColor,
-              padding: const EdgeInsets.symmetric(horizontal: padding16, vertical: 40),
-                child: Row(
-                  children: const [
-                    ProfileAvatarButton(size: 50),
-                    SizedBox(width: width16),
-                    Expanded(child: SizedBox()),
-                  ],
-                ),
-            ),
-          ),
-
-          // Поле поиска и результаты (независимо от белой панели)
-          Positioned(
-            top: 45,
-            right: 16,
-            child: SizedBox(
-              width: 300,
-              child: const RouteSearchWidget(),
-            ),
-          ),
+          Positioned(top: 0, left: 0, right: 0, child: MapTopBar()),
 
           // Кнопка меню снизу справа
           Positioned(

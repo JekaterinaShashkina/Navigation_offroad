@@ -11,6 +11,7 @@ import 'route_tracking_page.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final String name;           // название маршрута
+  final String? routeId;
   final List<dynamic> points;  // список map-ов: { 'lat': double, 'lng': double }
   final String? groupId;
 
@@ -19,6 +20,7 @@ class RouteDetailPage extends StatefulWidget {
     required this.name,
     required this.points, 
     this.groupId,
+    this.routeId,
   });
 
   @override
@@ -223,6 +225,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             child: NavigationBottomPanel(
               timeText: timeText,
               distanceText: distanceText,
+              showPrimaryButton: true,
               // СИМУЛЯЦИЯ
               onGo: () {
                 Navigator.push(
@@ -232,6 +235,8 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                       points: _routePoints,
                       mode: TrackingMode.live,
                       groupId: widget.groupId,
+                      routeName: widget.name,
+                      routeId: widget.routeId,
                       // mode: TrackingMode.live,
                     ),
                   ),

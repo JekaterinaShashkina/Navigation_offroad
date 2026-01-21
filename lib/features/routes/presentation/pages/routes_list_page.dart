@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,16 +7,34 @@ import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/widgets/app_button.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/pill.dart';
+
+import 'package:offroad_nav/features/routes/data/repositories/completed_route_repository.dart';
+import 'package:offroad_nav/features/routes/domain/entities/completed_route_entity.dart';
+import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
 import 'package:offroad_nav/features/routes/presentation/controller/routes_controller.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/route_card.dart';
+import 'package:offroad_nav/features/routes/presentation/pages/completed_route_detail_page.dart';
 import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page.dart';
+import 'package:offroad_nav/features/routes/presentation/widgets/completed_route_card.dart';
+import 'package:offroad_nav/features/routes/presentation/widgets/my_routes_accordion.dart';
+import 'package:offroad_nav/features/routes/presentation/widgets/pill.dart';
+import 'package:offroad_nav/features/routes/presentation/widgets/route_card.dart';
+import 'package:offroad_nav/features/routes/presentation/widgets/route_card_tile.dart';
 
 enum RoutesTab { all, mine }
 
 class RoutesListPage extends ConsumerStatefulWidget {
   final bool selectionMode;
-  const RoutesListPage({super.key, this.selectionMode = false,});
+  final RoutesTab initialTab;
+
+  /// если true — показываем полный список "My routes" (без аккордеона)
+  final bool showAllMine;
+
+  const RoutesListPage({
+    super.key,
+    this.selectionMode = false,
+    this.initialTab = RoutesTab.all,
+    this.showAllMine = false,
+  });
 
   @override
   ConsumerState<RoutesListPage> createState() => _RoutesListPageState();
@@ -23,7 +42,16 @@ class RoutesListPage extends ConsumerStatefulWidget {
 
 class _RoutesListPageState extends ConsumerState<RoutesListPage> {
   final _search = TextEditingController();
-  RoutesTab _tab = RoutesTab.all;
+  late RoutesTab _tab;
+
+  late final CompletedRouteRepository _completedRepo;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = widget.initialTab;
+    _completedRepo = CompletedRouteRepository(FirebaseFirestore.instance);
+  }
 
   @override
   void dispose() {
@@ -34,23 +62,25 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
   @override
   Widget build(BuildContext context) {
     final routesState = ref.watch(routesControllerProvider);
-    // final repo = RoutesRepository();
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    // 1) фильтр по табу
-    final byTab = routesState.routes.where((r) {
-      return switch (_tab) {
-        RoutesTab.all  => r.isPublic,        // только публичные
-        RoutesTab.mine => r.ownerId == uid,  // только мои
-      };
-    }).toList();
+    // базовые списки
+    final allPublic = routesState.routes.where((r) => r.isPublic).toList();
+    final myRoutes = routesState.routes.where((r) => r.ownerId == uid).toList();
 
-    // 2) фильтр по поиску
+    // поиск
     final query = _search.text.trim().toLowerCase();
-    final filteredRoutes = byTab.where((r) {
-      if (query.isEmpty) return true;
-      return r.name.toLowerCase().contains(query);
-    }).toList();
+
+    List<RouteEntity> applySearch(List<RouteEntity> list) {
+      if (query.isEmpty) return list;
+      return list.where((r) => r.name.toLowerCase().contains(query)).toList();
+    }
+
+    final allPublicFiltered = applySearch(allPublic);
+    final myRoutesFiltered = applySearch(myRoutes);
+
+    // текущий список для обычного списка (all / mine)
+    final listForTab = _tab == RoutesTab.all ? allPublicFiltered : myRoutesFiltered;
 
     return Scaffold(
       appBar: NewAppBar(
@@ -71,8 +101,7 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: surfaceColor,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: padding12),
+                contentPadding: const EdgeInsets.symmetric(vertical: padding12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(radius16),
                   borderSide: BorderSide.none,
@@ -105,10 +134,10 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
             ),
           ),
 
-          // список
+          // контент
           Expanded(
             child: Builder(
-              builder: (context) {
+              builder: (_) {
                 if (routesState.loading) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -122,52 +151,85 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
                   );
                 }
 
-                if (filteredRoutes.isEmpty) {
-                  return const Center(child: Text('No routes found'));
+                // ---------- вкладка ALL ----------
+                if (_tab == RoutesTab.all) {
+                  if (listForTab.isEmpty) {
+                    return const Center(child: Text('No routes found'));
+                  }
+                  return _routesListSeparated(
+                    context: context,
+                    routes: listForTab,
+                    uid: uid,
+                    ref: ref,
+                  );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
-                  itemCount: filteredRoutes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final route = filteredRoutes[index];
-                    final isOwner = route.ownerId == uid;
+                // ---------- вкладка MY ----------
+                // если пришли в режим "Show all mine" — показываем обычный список
+                if (widget.showAllMine) {
+                  if (myRoutesFiltered.isEmpty) {
+                    return const Center(child: Text('No routes found'));
+                  }
+                  return _routesListSeparated(
+                    context: context,
+                    routes: myRoutesFiltered,
+                    uid: uid,
+                    ref: ref,
+                  );
+                }
 
-                    return RouteCard(
-                      route: route,
-                      isOwner: isOwner,
-                      onTap: () {
-                        if (widget.selectionMode) {
-                          Navigator.pop(context, route); // вернуть выбранный маршрут
-                        } else {
+                // иначе — аккордеон (превью 5) + completed/favorites
+                return StreamBuilder<List<CompletedRouteEntity>>(
+                  stream: _completedRepo.watchMyCompletedRoutes(uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Text('Failed to load completed routes'),
+                      );
+                    }
+
+                    final completed =
+                        snapshot.data ?? const <CompletedRouteEntity>[];
+
+                    return MyRoutesAccordion(
+                      myRoutes: myRoutesFiltered,
+                        completedRoutes: completed,
+                        favoritesCount: 0,
+
+                        buildRoutePreviewItem: (route) => RouteCardTile(
+                          route: route,
+                          uid: uid,
+                          selectionMode: widget.selectionMode,
+                        ),
+
+                        buildCompletedPreviewItem: (item) => CompletedRouteCard(
+                          item: item,
+                          onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => RouteDetailPage(
-                                name: route.name,
-                                points: route.points
-                                    .map((p) => {'lat': p.lat, 'lng': p.lng})
-                                    .toList(),
+                              builder: (_) => CompletedRouteDetailPage(
+                                name: item.routeName,
+                                completedPoints: item.traversedPolyline ?? const <Map<String, double>>[],
+                                //plannedPoints: item.plannedPoints, // если есть
+                                completedAt: item.finishedAt,
+                                duration: Duration(seconds: item.durationSec),
                               ),
                             ),
                           );
-                        }
+                          },
+                        ),
+                      onShowAllMyRoutes: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RoutesListPage(
+                              initialTab: RoutesTab.mine,
+                              showAllMine: true,
+                            ),
+                          ),
+                        );
                       },
-                      onToggleVisibility: isOwner
-                          ? () async {
-                              await ref
-                                  .read(routesControllerProvider.notifier)
-                                  .togglePrivacy(route);
-                            }
-                          : null,
-                      onDelete: isOwner
-                          ? () => _confirmDelete(
-                            context, 
-                            route.id, 
-                            ref
-                              )
-                          : null,
                     );
                   },
                 );
@@ -176,6 +238,7 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
           ),
         ],
       ),
+
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: AppButton(
@@ -196,8 +259,7 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete route?'),
-        content:
-            const Text('Are you sure you want to delete this route?'),
+        content: const Text('Are you sure you want to delete this route?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -205,10 +267,7 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
           ),
           TextButton(
             onPressed: () async {
-              await    ref
-                .read(routesControllerProvider.notifier)
-                .deleteRoute(routeId); 
-
+              await ref.read(routesControllerProvider.notifier).deleteRoute(routeId);
               if (context.mounted) Navigator.pop(context);
             },
             child: const Text(
@@ -218,6 +277,51 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
           ),
         ],
       ),
+    );
+  }
+
+  // ---------- UI: обычный список (для All routes и Show all mine) ----------
+  Widget _routesListSeparated({
+    required BuildContext context,
+    required List<RouteEntity> routes,
+    required String uid,
+    required WidgetRef ref,
+  }) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+      itemCount: routes.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final route = routes[index];
+        final isOwner = route.ownerId == uid;
+
+        return RouteCard(
+          route: route,
+          isOwner: isOwner,
+          onTap: () {
+            if (widget.selectionMode) {
+              Navigator.pop(context, route);
+              return;
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RouteDetailPage(
+                  name: route.name,
+                  points: route.points.map((p) => {'lat': p.lat, 'lng': p.lng}).toList(),
+                ),
+              ),
+            );
+          },
+          onToggleVisibility: isOwner
+              ? () async {
+                  await ref.read(routesControllerProvider.notifier).togglePrivacy(route);
+                }
+              : null,
+          onDelete: isOwner ? () => _confirmDelete(context, route.id, ref) : null,
+        );
+      },
     );
   }
 }

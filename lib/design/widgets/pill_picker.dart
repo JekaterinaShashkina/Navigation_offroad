@@ -159,7 +159,7 @@ class _PillPickerSheetState<T> extends State<_PillPickerSheet<T>> {
               height: 4,
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFD0D0D6),
+                color: backgroundSecondColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -217,7 +217,7 @@ class _PillPickerSheetState<T> extends State<_PillPickerSheet<T>> {
                           ? Icons.check_circle_rounded
                           : Icons.circle_outlined,
                       color: isSelected
-                          ? buttonSecondBackgroundColor
+                          ? buttonBackgroundColor
                           : textHintColor,
                     ),
                     trailing: const Icon(

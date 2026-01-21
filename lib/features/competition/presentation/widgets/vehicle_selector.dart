@@ -17,11 +17,11 @@ class VehicleSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _vehicleCard('ATV', motoIconPath),
+        _vehicleCard('Moto', motoIconPath),
         const SizedBox(width: 12),
-        _vehicleCard('Jeep', jeepIconPath),
+        _vehicleCard('Auto', jeepIconPath),
         const SizedBox(width: 12),
-        _vehicleCard('Truck', truckIconPath),
+        _vehicleCard('Walk', manIconPath),
       ],
     );
   }
