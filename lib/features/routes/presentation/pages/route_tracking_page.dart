@@ -33,18 +33,41 @@ import '../tracking/controllers/route_tracking_controller.dart';
 
 // ✅ UI панели
 
-enum TrackingMode { simulated, live }
+enum TrackingMode { simulated, live, competition  }
+
+
+class TrackingResult {
+  final DateTime startedAt;
+  final DateTime finishedAt;
+  final int startIndex;
+  final int endIndex;
+  final double distanceMeters;
+  final List<LatLng> traversedPolyline;
+  final String profileName;
+
+  TrackingResult({
+    required this.startedAt,
+    required this.finishedAt,
+    required this.startIndex,
+    required this.endIndex,
+    required this.distanceMeters,
+    required this.traversedPolyline,
+    required this.profileName,
+  });
+
+  int get durationSec => finishedAt.difference(startedAt).inSeconds;
+}
+
 
 class RouteTrackingPage extends ConsumerStatefulWidget {
   final List<LatLng> points;
   final TrackingMode mode;
-
   /// Если null — одиночный режим (без live-участников).
   final String? groupId;
-
   final String? routeId;
   final String routeName;
-
+  final Future<void> Function(TrackingResult result)? onFinish;
+  final Future<void> Function()? onCancel;
 
   const RouteTrackingPage({
     super.key,
@@ -53,6 +76,8 @@ class RouteTrackingPage extends ConsumerStatefulWidget {
     this.routeId,
     this.mode = TrackingMode.simulated,
     this.groupId,
+    this.onFinish,
+    this.onCancel,
   });
 
   @override
@@ -107,7 +132,7 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
     WakelockPlus.enable();
 
     // ✅ подписки на group provider (ТОЛЬКО один раз, не в build)
-    if (widget.groupId != null) {
+    if (widget.groupId != null && widget.mode == TrackingMode.live) {
       final gid = widget.groupId!;
 
       _ownerSub = ref.listenManual<AsyncValue<String?>>(
@@ -186,6 +211,8 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
 
   @override
   void dispose() {
+    _ownerSub?.close();
+    _usersSub?.close();
     if (widget.groupId != null && widget.mode == TrackingMode.live) {
       unawaited(
         _presence.stopSharing(ref: ref, groupId: widget.groupId, uid: _uid),
@@ -328,7 +355,10 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         traversedPoints.addAll(widget.points.sublist(startIdx, startIdx + 2));
       }
     }
+    
     final isPaused = false; // пока заглушка, потом подключим
+    final isCompetition = widget.mode == TrackingMode.competition;
+
 
     final actions = <ActionButtonConfig>[
       ActionButtonConfig(
@@ -338,13 +368,22 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         filled: true, // сделаем главной
         enabled: started,
       ),
-      ActionButtonConfig(
-        label: isPaused ? 'Resume' : 'Pause',
-        iconData: isPaused ? Icons.play_arrow : Icons.pause,
-        onTap: started ? _togglePause : null,
-        filled: false,
-        enabled: started,
-      ),
+        if (isCompetition)
+        ActionButtonConfig(
+          label: 'Cancel',
+          iconData: Icons.close,
+          onTap: _cancelAttempt, // сделаем
+          filled: false,
+          enabled: true,
+        ),
+      if (!isCompetition)
+        ActionButtonConfig(
+          label: isPaused ? 'Resume' : 'Pause',
+          iconData: isPaused ? Icons.play_arrow : Icons.pause,
+          onTap: started ? _togglePause : null,
+          filled: false,
+          enabled: started,
+        ),
       ActionButtonConfig(
         label: 'Settings',
         iconData: Icons.settings,
@@ -364,12 +403,14 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
 
     // --- live users ---
     final gid = widget.groupId;
-    final ownerAsync = gid == null
+    final shouldShowLive = gid != null && widget.mode == TrackingMode.live;
+    final ownerAsync = !shouldShowLive
         ? const AsyncValue<String?>.data(null)
-        : ref.watch(groupOwnerIdProvider(gid));
-    final liveUsersAsync = gid == null
+        : ref.watch(groupOwnerIdProvider(gid!));
+
+    final liveUsersAsync = !shouldShowLive
         ? const AsyncValue<List<LiveUserView>>.data(<LiveUserView>[])
-        : ref.watch(liveUsersWithProfilesProvider(gid));
+        : ref.watch(liveUsersWithProfilesProvider(gid!));
 
     final routeMarkers = buildRouteStartEndMarkers(points: widget.points);
     final liveMarkers = liveUsersAsync.when(
@@ -439,7 +480,7 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
           ),
 
           // follow leader button (только если мы в группе)
-          if (gid != null)
+          if (gid != null && widget.mode == TrackingMode.live)
             Positioned(
               right: padding16,
               bottom: 140, // ← подбирается под + / − (можно 130–160)
@@ -503,59 +544,79 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
   }
 
   Future<void> _finishTracking() async {
-    final st = _progress.state;
+  final st = _progress.state;
 
-    if (!st.started || st.startTime == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('You have not started yet')));
+  if (!st.started || st.startTime == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('You have not started yet')),
+    );
+    return;
+  }
+
+  final finishedAt = DateTime.now();
+  final startedAt = st.startTime!;
+
+  final profile = ref.read(trackingProfileProvider);
+
+  final startIdx = st.startIndex.clamp(0, widget.points.length - 1);
+  final endIdx = st.closestIndex.clamp(startIdx, widget.points.length - 1);
+
+  final distanceM = st.traversedMeters;
+
+  final traversed = (endIdx > startIdx)
+      ? widget.points.sublist(startIdx, endIdx + 1)
+      : <LatLng>[];
+
+  final result = TrackingResult(
+    startedAt: startedAt,
+    finishedAt: finishedAt,
+    startIndex: startIdx,
+    endIndex: endIdx,
+    distanceMeters: distanceM,
+    traversedPolyline: traversed,
+    profileName: profile.name,
+  );
+
+  try {
+    // ✅ 1) Если передали onFinish — значит “особый режим” (например competition)
+    if (widget.onFinish != null) {
+      await widget.onFinish!(result);
+
+      if (!mounted) return;
+      Navigator.pop(context);
       return;
     }
 
-    final finishedAt = DateTime.now();
-    final startedAt = st.startTime!;
+    // ✅ 2) Обычный режим: сохраняем completed как раньше
+    await _completedRepo.saveCompletedRoute(
+      userId: _uid,
+      profileName: profile.name,
+      startedAt: startedAt,
+      finishedAt: finishedAt,
+      distanceMeters: distanceM,
+      startIndex: startIdx,
+      endIndex: endIdx,
+      traversedPolyline: traversed,
+      mode: widget.groupId == null ? 'solo' : 'group',
+      groupId: widget.groupId,
+      routeId: widget.routeId,
+      routeName: widget.routeName,
+    );
 
-    final profile = ref.read(trackingProfileProvider);
+    if (!mounted) return;
 
-    final startIdx = st.startIndex.clamp(0, widget.points.length - 1);
-    final endIdx = st.closestIndex.clamp(startIdx, widget.points.length - 1);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Route saved')),
+    );
 
-    final distanceM = st.traversedMeters;
-
-    final traversed = (endIdx > startIdx)
-        ? widget.points.sublist(startIdx, endIdx + 1)
-        : <LatLng>[];
-
-    try {
-      await _completedRepo.saveCompletedRoute(
-        userId: _uid,
-        profileName: profile.name,
-        startedAt: startedAt,
-        finishedAt: finishedAt,
-        distanceMeters: distanceM,
-        startIndex: startIdx,
-        endIndex: endIdx,
-        traversedPolyline: traversed, // можно убрать вообще, если не нужно
-        mode: widget.groupId == null ? 'solo' : 'group',
-        groupId: widget.groupId,
-        routeId: widget.routeId,  // ✅ можно не писать (если optional) 
-        routeName: widget.routeName,
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Route saved')));
-
-      Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
-    }
+    Navigator.pop(context);
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to save: $e')),
+    );
   }
+}
 
   void _togglePause() {
     ScaffoldMessenger.of(
@@ -574,11 +635,45 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         ref.read(trackingProfileProvider.notifier).set(p);
 
         // применяем настройки GPS только если это live
-        if (widget.mode == TrackingMode.live && _source is LiveTrackingSource) {
+        if (widget.mode != TrackingMode.simulated && _source is LiveTrackingSource) {
           await (_source as LiveTrackingSource).applyProfile(p);
         }
         },
       ),
     );
   }
+  
+  Future<void> _cancelAttempt() async {
+  if (widget.onCancel == null) {
+    Navigator.pop(context);
+    return;
+  }
+
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Cancel attempt?'),
+      content: const Text('Progress will not be saved.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep going')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancel')),
+      ],
+    ),
+  );
+
+  if (ok != true) return;
+
+  try {
+    await widget.onCancel!();
+    if (!mounted) return;
+    Navigator.pop(context);
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to cancel: $e')),
+    );
+  }
 }
+
+}
+

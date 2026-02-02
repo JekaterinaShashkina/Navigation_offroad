@@ -22,6 +22,16 @@ class RoutesRepository {
     });
   }
 
+  Future<RouteEntity> getRouteById(String routeId) async {
+  final doc = await _col.doc(routeId).get();
+
+  if (!doc.exists) {
+    throw Exception('Route not found');
+  }
+
+  return RouteModel.fromDoc(doc).toEntity(doc.id);
+}
+
   /// 💾 Сохранить маршрут.
   /// Если id пустой — создаём новый документ и возвращаем его id.
   /// Если id не пустой — обновляем существующий.

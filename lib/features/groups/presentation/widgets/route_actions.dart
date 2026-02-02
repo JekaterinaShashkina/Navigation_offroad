@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
+import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
 import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page.dart';
 
 class RouteActions {
@@ -27,7 +28,11 @@ class RouteActions {
 
       final data = doc.data() as Map<String, dynamic>;
       final name = (data['name'] ?? 'Route').toString();
-      final points = (data['points'] ?? []) as List<dynamic>;
+      final rawPoints = (data['points'] as List?) ?? const [];
+
+      final points = rawPoints
+          .map((p) => RoutePoint.fromAny(p))
+          .toList();
 
       await Navigator.push(
         context,

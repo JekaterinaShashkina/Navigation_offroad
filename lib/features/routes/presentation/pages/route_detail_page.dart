@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
 
 import '../../../../design/colors.dart';
 import '../../../../design/widgets/app_bar.dart';
@@ -12,8 +13,11 @@ import 'route_tracking_page.dart';
 class RouteDetailPage extends StatefulWidget {
   final String name;           // название маршрута
   final String? routeId;
-  final List<dynamic> points;  // список map-ов: { 'lat': double, 'lng': double }
+  final List<RoutePoint> points;
   final String? groupId;
+
+  final TrackingMode mode;        // ✅
+  final Future<void> Function()? onGo; // ✅ кастомная логика (competition)
 
   const RouteDetailPage({
     super.key,
@@ -21,6 +25,8 @@ class RouteDetailPage extends StatefulWidget {
     required this.points, 
     this.groupId,
     this.routeId,
+    this.mode = TrackingMode.live,
+    this.onGo,
   });
 
   @override
@@ -37,15 +43,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   void initState() {
     super.initState();
 
-    // Преобразуем points в LatLng
     _routePoints = widget.points
-        .map<LatLng>((p) {
-          final m = p as Map;
-          final lat = (m['lat'] as num).toDouble();
-          final lng = (m['lng'] as num).toDouble();
-          return LatLng(lat, lng);
-        })
-        .toList();
+    .map((p) => LatLng(p.lat, p.lng))
+    .toList();
 
     // Считаем длину маршрута
     _routeDistanceKm = _computeRouteDistanceKm(_routePoints);
@@ -227,17 +227,20 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
               distanceText: distanceText,
               showPrimaryButton: true,
               // СИМУЛЯЦИЯ
-              onGo: () {
+              onGo: ()async{
+                if (widget.onGo != null) {
+                  await widget.onGo!();
+                  return;
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => RouteTrackingPage(
                       points: _routePoints,
-                      mode: TrackingMode.live,
+                      mode: widget.mode,
                       groupId: widget.groupId,
                       routeName: widget.name,
                       routeId: widget.routeId,
-                      // mode: TrackingMode.live,
                     ),
                   ),
                 );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
 import 'package:offroad_nav/features/routes/presentation/controller/routes_controller.dart';
@@ -39,7 +40,7 @@ class RouteCardTile extends ConsumerWidget {
           MaterialPageRoute(
             builder: (_) => RouteDetailPage(
               name: route.name,
-              points: route.points.map((p) => {'lat': p.lat, 'lng': p.lng}).toList(),
+              points: route.points,
             ),
           ),
         );

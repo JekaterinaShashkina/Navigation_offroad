@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
@@ -210,7 +211,7 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
                             MaterialPageRoute(
                               builder: (_) => CompletedRouteDetailPage(
                                 name: item.routeName,
-                                completedPoints: item.traversedPolyline ?? const <Map<String, double>>[],
+                                completedPoints: item.traversedPolyline,
                                 //plannedPoints: item.plannedPoints, // если есть
                                 completedAt: item.finishedAt,
                                 duration: Duration(seconds: item.durationSec),
@@ -309,7 +310,7 @@ class _RoutesListPageState extends ConsumerState<RoutesListPage> {
               MaterialPageRoute(
                 builder: (_) => RouteDetailPage(
                   name: route.name,
-                  points: route.points.map((p) => {'lat': p.lat, 'lng': p.lng}).toList(),
+                  points: route.points,
                 ),
               ),
             );

@@ -15,7 +15,7 @@ class Competition {
   final String createdBy;
   // final bool useLimit;
   // final int? limitMinutes; // храним сырые минуты, Duration можно посчитать геттером
-  final String? vehicleType;    // 'ATV' | 'Jeep' | 'Truck'
+  final String? vehicleType;    // 'Moto' | 'Auto' | 'Walk'
   // final String ownerId;
   // final String status;     // 'draft' | 'active' | 'completed' | etc.
 

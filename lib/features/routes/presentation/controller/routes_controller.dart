@@ -4,6 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:offroad_nav/features/routes/data/repositories/routes_repository.dart';
 import '../../domain/entities/route_entity.dart';
 
+// --- providers ---
+final routesRepositoryProvider = Provider<RoutesRepository>((ref) {
+  return RoutesRepository();
+});
+
+final routeByIdProvider =
+    FutureProvider.family<RouteEntity, String>((ref, routeId) async {
+  return ref.read(routesRepositoryProvider).getRouteById(routeId);
+});
+
+final routesControllerProvider =
+    NotifierProvider<RoutesController, RoutesState>(RoutesController.new);
+
+// --- state ---
 class RoutesState {
   final bool loading;
   final List<RouteEntity> routes;
@@ -28,19 +42,15 @@ class RoutesState {
   }
 }
 
-final routesControllerProvider =
-    NotifierProvider<RoutesController, RoutesState>(
-  RoutesController.new,
-);
-
+// --- controller ---
 class RoutesController extends Notifier<RoutesState> {
-  final _repo = RoutesRepository();
-  
+  late final RoutesRepository _repo;
   StreamSubscription<List<RouteEntity>>? _sub;
 
   @override
   RoutesState build() {
-    // при первом build подписываемся на стрим
+    _repo = ref.read(routesRepositoryProvider);
+
     _sub ??= _repo.watchAllRoutes().listen(
       (routes) {
         state = state.copy(
@@ -57,64 +67,43 @@ class RoutesController extends Notifier<RoutesState> {
       },
     );
 
-    // отписка, когда провайдер умирает
-    ref.onDispose(() {
-      _sub?.cancel();
-    });
+    ref.onDispose(() => _sub?.cancel());
 
-    // пока стрим не дал данные — показываем лоадер
     return const RoutesState(loading: true);
   }
 
   Future<void> togglePrivacy(RouteEntity route) async {
     final newValue = !route.isPublic;
 
-    // оптимистично обновляем локальный стейт
     state = state.copy(
       routes: [
         for (final r in state.routes)
-          if (r.id == route.id)
-            r.copyWith(isPublic: newValue) // нужен copyWith у RouteEntity
-          else
-            r,
+          if (r.id == route.id) r.copyWith(isPublic: newValue) else r,
       ],
       error: null,
     );
 
     try {
       await _repo.setPrivacy(route.id, newValue);
-      // стрим потом всё равно пришлёт актуальное состояние
     } catch (e) {
-      // по желанию можно откатить
       state = state.copy(error: 'Failed to update privacy: $e');
     }
   }
 
   Future<void> deleteRoute(String id) async {
-    // оптимистично убираем маршрут из списка
-    final updated = [
-      for (final r in state.routes)
-        if (r.id != id) r,
-    ];
-
     state = state.copy(
-      routes: updated,
+      routes: [for (final r in state.routes) if (r.id != id) r],
       error: null,
     );
 
     try {
       await _repo.deleteRoute(id);
-      // стрим потом всё равно подтянет актуальное состояние
     } catch (e) {
       state = state.copy(error: 'Failed to delete route: $e');
-      // по желанию можно откатить список назад
     }
   }
 
-  /// Формальный reload — стрим и так отдаст обновления,
-  /// но можем просто пометить, что идёт загрузка
   Future<void> reload() async {
     state = state.copy(loading: true);
-    // Ничего больше не делаем — Firestore сам триггерит стрим.
   }
 }
