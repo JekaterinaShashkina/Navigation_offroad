@@ -6,7 +6,6 @@ import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/pill_picker.dart';
 
 import 'package:offroad_nav/features/competition/data/repositories/competitions_repository.dart';
-import 'package:offroad_nav/features/competition/application/providers/competitions_providers.dart';
 import 'package:offroad_nav/features/competition/domain/config/competition_rules.dart';
 import 'package:offroad_nav/features/competition/domain/config/competition_rules.dart' show CompetitionRule;
 import 'package:offroad_nav/features/competition/domain/entities/competition.dart';

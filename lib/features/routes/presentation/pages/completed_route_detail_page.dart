@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../../../design/colors.dart';
 import '../../../../design/widgets/app_bar.dart';
 import '../widgets/map_right_buttons.dart';
 import '../widgets/navigation_bottom_panel.dart';
@@ -59,15 +58,6 @@ class _CompletedRouteDetailPageState extends State<CompletedRouteDetailPage> {
     // Дистанцию логичнее считать по фактическому треку.
     final baseForDistance = _completed.isNotEmpty ? _completed : _planned;
     _distanceKm = _computeRouteDistanceKm(baseForDistance);
-  }
-
-  List<LatLng> _toLatLngList(List<dynamic> points) {
-    return points.map<LatLng>((p) {
-      final m = p as Map;
-      final lat = (m['lat'] as num).toDouble();
-      final lng = (m['lng'] as num).toDouble();
-      return LatLng(lat, lng);
-    }).toList();
   }
 
   // ----- расчёт дистанции -----
