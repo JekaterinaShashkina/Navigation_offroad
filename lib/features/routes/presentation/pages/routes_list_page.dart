@@ -16,7 +16,7 @@ import 'package:offroad_nav/features/routes/presentation/pages/completed_route_d
 import 'package:offroad_nav/features/routes/presentation/pages/route_detail_page.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/completed_route_card.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/my_routes_accordion.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/pill.dart';
+import 'package:offroad_nav/design/widgets/pill.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/route_card.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/route_card_tile.dart';
 

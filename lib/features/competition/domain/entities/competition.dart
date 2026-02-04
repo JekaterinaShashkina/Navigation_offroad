@@ -1,4 +1,3 @@
-// lib/features/competitions/domain/competition.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum CompetitionStatus { upcoming, active, ended }
@@ -13,11 +12,9 @@ class Competition {
   final DateTime startAt;
   final DateTime endAt;
   final String createdBy;
-  // final bool useLimit;
-  // final int? limitMinutes; // храним сырые минуты, Duration можно посчитать геттером
   final String? vehicleType;    // 'Moto' | 'Auto' | 'Walk'
-  // final String ownerId;
-  // final String status;     // 'draft' | 'active' | 'completed' | etc.
+  final String adminId;
+  final String? adminName;
 
   const Competition(  {
     required this.id,
@@ -29,11 +26,10 @@ class Competition {
     required this.startAt,
     required this.endAt,
     required this.createdBy,
-    // required this.useLimit,
-    // this.limitMinutes,
+    required this.adminId,
+    this.adminName,
     this.vehicleType,
-    // required this.ownerId,
-    // required this.status,
+
   });
 
   CompetitionStatus get status {
@@ -45,6 +41,10 @@ class Competition {
 
   factory Competition.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? <String, dynamic>{};
+    final createdBy = data['createdBy'] as String? ?? data['owner_id'] as String? ?? '';
+    final adminIdRaw = (data['adminId'] as String?)?.trim();
+    final adminId = (adminIdRaw != null && adminIdRaw.isNotEmpty) ? adminIdRaw : createdBy;
+    
     return Competition(
       id: doc.id,
       name: (data['name'] as String? ?? data['title'] as String? ?? '').trim(),
@@ -60,7 +60,9 @@ class Competition {
           (data['end_time'] as Timestamp?)?.toDate() ??
           (data['start_time'] as Timestamp?)?.toDate() ??
           DateTime.now(),
-      createdBy: data['createdBy'] as String? ?? data['owner_id'] as String? ?? '',
+      createdBy: createdBy,
+      adminId: (adminId != null && adminId.isNotEmpty) ? adminId : createdBy,
+      adminName: (data['adminName'] as String?)?.trim(),
     );
   }
   
@@ -75,6 +77,8 @@ class Competition {
       'startAt': Timestamp.fromDate(startAt),
       'endAt': Timestamp.fromDate(endAt),
       'createdBy': createdBy,
+      'adminId': adminId,
+      'adminName': adminName,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }

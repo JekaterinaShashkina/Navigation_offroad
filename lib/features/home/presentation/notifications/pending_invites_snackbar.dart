@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
-import 'package:offroad_nav/features/friends/presentation/pages/my_friends_page.dart';
+import 'package:offroad_nav/features/home/presentation/pages/notifications_page.dart';
 
 class PendingInvitesSnackbarController {
   PendingInvitesSnackbarController({FriendsRepository? repo})
@@ -35,7 +35,7 @@ class PendingInvitesSnackbarController {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const MyFriendsPage()),
+                    MaterialPageRoute(builder: (_) => const NotificationsPage()),
                   );
                 },
               ),

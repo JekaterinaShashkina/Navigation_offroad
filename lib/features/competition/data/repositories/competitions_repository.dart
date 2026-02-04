@@ -70,6 +70,9 @@ class CompetitionsRepository {
   Future<String> createCompetition(CompetitionInput input) async {
     final uid = _requireUser();
     final now = FieldValue.serverTimestamp();
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final userData = userDoc.data() ?? {};
+    final adminName = (userData['name'] as String? ?? userData['email'] as String? ?? '').trim();
 
     final doc = await _col.add({
       'name': input.name.trim(),
@@ -81,6 +84,8 @@ class CompetitionsRepository {
       'startAt': Timestamp.fromDate(input.startAt),
       'endAt': Timestamp.fromDate(input.endAt),
       'createdBy': uid,
+      'adminId': uid,
+      'adminName': adminName,
       'createdAt': now,
       'updatedAt': now,
     });
@@ -251,50 +256,73 @@ class CompetitionsRepository {
   }
 
   Future<void> finishAttemptWithResult({
+    required String competitionId,
+    required String attemptId,
+    required int durationSeconds,
+    required double distanceMeters,
+    required int startIndex,
+    required int endIndex,
+    List<Map<String, double>>? traversed,
+  }) async {
+    final uid = _requireUser();
+
+    final competition = await _fetchCompetitionOrThrow(competitionId);
+    if (competition.status != CompetitionStatus.active) {
+      throw CompetitionActionException('Competition is not active');
+    }
+
+    final ref = _attempts(competitionId).doc(attemptId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) {
+        throw CompetitionActionException('Attempt not found');
+      }
+
+      final data = snap.data() as Map<String, dynamic>;
+
+      if (data['uid'] != uid) {
+        throw CompetitionActionException('Not your attempt');
+      }
+      if (data['finishedAt'] != null) {
+        throw CompetitionActionException('Attempt already finished');
+      }
+
+      // ---- нормализация/валидация ----
+      final dur = durationSeconds < 0 ? 0 : durationSeconds;
+      final dist = distanceMeters.isNaN || distanceMeters.isInfinite
+          ? 0.0
+          : distanceMeters;
+
+      final sIdx = startIndex < 0 ? 0 : startIndex;
+      final eIdx = endIndex < 0 ? 0 : endIndex;
+
+      tx.update(ref, {
+        'finishedAt': FieldValue.serverTimestamp(), // см. пункт 2
+        'durationSeconds': dur,
+        'distanceMeters': dist,
+        'startIndex': sIdx,
+        'endIndex': eIdx,
+        if (traversed != null) 'traversed': traversed,
+      });
+    });
+  }
+
+  Future<void> cancelAttempt(String competitionId, String attemptId) async {
+    await _attempts(competitionId).doc(attemptId).delete();
+  }
+
+Future<void> updateCompetitionAdmin({
   required String competitionId,
-  required String attemptId,
-  required int durationSeconds,
-  required double distanceMeters,
-  required int startIndex,
-  required int endIndex,
-  List<Map<String, double>>? traversed, // optional
+  required String adminId,
+  required String adminName,
 }) async {
-  final uid = _requireUser();
-
-  final competition = await _fetchCompetitionOrThrow(competitionId);
-  if (competition.status != CompetitionStatus.active) {
-    throw CompetitionActionException('Competition is not active');
-  }
-
-  final ref = _attempts(competitionId).doc(attemptId);
-  final snap = await ref.get();
-  if (!snap.exists) {
-    throw CompetitionActionException('Attempt not found');
-  }
-
-  final data = snap.data()!;
-  if (data['uid'] != uid) {
-    throw CompetitionActionException('Not your attempt');
-  }
-
-  if (data['finishedAt'] != null) {
-    throw CompetitionActionException('Attempt already finished');
-  }
-
-  final finishTime = DateTime.now();
-
-  await ref.update({
-    'finishedAt': Timestamp.fromDate(finishTime),
-    'durationSeconds': durationSeconds < 0 ? 0 : durationSeconds,
-    'distanceMeters': distanceMeters,
-    'startIndex': startIndex,
-    'endIndex': endIndex,
-    if (traversed != null) 'traversed': traversed,
+  _requireUser();
+  await _col.doc(competitionId).update({
+    'adminId': adminId,
+    'adminName': adminName,
+    'updatedAt': FieldValue.serverTimestamp(),
   });
 }
 
-
-  Future<void> cancelAttempt(String competitionId, String attemptId) async {
-  await _attempts(competitionId).doc(attemptId).delete();
-}
 }

@@ -5,7 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/features/friends/data/repositories/friends_repository.dart';
-import 'package:offroad_nav/features/friends/presentation/pages/my_friends_page.dart';
+import 'package:offroad_nav/features/home/presentation/pages/notifications_page.dart';
 import 'package:offroad_nav/features/home/presentation/notifications/pending_invites_snackbar.dart';
 import 'package:offroad_nav/features/home/presentation/widgets/map_top_bar.dart';
 
@@ -42,6 +42,7 @@ void initState() {
     // final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
+      backgroundColor: backgroundMainColor,
       body: Stack(
         children: [
           // Google Map на фоне

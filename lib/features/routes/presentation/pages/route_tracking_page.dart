@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/avatar_marker_factory.dart';
+import 'package:offroad_nav/features/competition/presentation/services/competition_presence_service.dart';
 import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
 import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
 import 'package:offroad_nav/features/routes/data/repositories/completed_route_repository.dart';
@@ -68,6 +69,8 @@ class RouteTrackingPage extends ConsumerStatefulWidget {
   final String routeName;
   final Future<void> Function(TrackingResult result)? onFinish;
   final Future<void> Function()? onCancel;
+    final String? competitionId;
+
 
   const RouteTrackingPage({
     super.key,
@@ -78,6 +81,8 @@ class RouteTrackingPage extends ConsumerStatefulWidget {
     this.groupId,
     this.onFinish,
     this.onCancel,
+    this.competitionId,
+
   });
 
   @override
@@ -86,34 +91,26 @@ class RouteTrackingPage extends ConsumerStatefulWidget {
 
 class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
   GoogleMapController? _controller;
-
   final _iconsLoader = MapIconsLoader();
-
   BitmapDescriptor? _arrowIcon;
   BitmapDescriptor? _crownIcon;
-
   /// кэш иконок аватаров для маркеров
   final Map<String, BitmapDescriptor> _avatarIcons = {};
-
   // tracking sources
   late final ITrackingSource _source;
   StreamSubscription<TrackSample>? _sub;
-
   // presence for group live mode (RTDB)
   final _presence = TrackingPresenceService();
-
   // uid
   late final String _uid;
-
   // ✅ разделённые контроллеры
   final _progress = RouteTrackingController();
   final _leader = LeaderFollowController();
   ProviderSubscription<AsyncValue<String?>>? _ownerSub;
   ProviderSubscription<AsyncValue<List<LiveUserView>>>? _usersSub;
-
   DateTime? _lastCameraMoveAt;
-
   late final CompletedRouteRepository _completedRepo;
+  final _competitionPresence = CompetitionPresenceService();
 
   @override
   void initState() {
@@ -194,6 +191,19 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         );
       }
 
+      if (widget.mode == TrackingMode.competition && widget.competitionId != null) {
+          unawaited(
+            _competitionPresence.send(
+              ref: ref,
+              competitionId: widget.competitionId!,
+              uid: _uid,
+              pos: s.pos,
+              bearing: _progress.state.bearingDeg,
+              accuracyM: s.accuracyM ?? 0,
+            ),
+          );
+        }
+
       // перерисовка UI
       if (mounted) setState(() {});
     });
@@ -216,6 +226,15 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
     if (widget.groupId != null && widget.mode == TrackingMode.live) {
       unawaited(
         _presence.stopSharing(ref: ref, groupId: widget.groupId, uid: _uid),
+      );
+    }
+    if (widget.mode == TrackingMode.competition && widget.competitionId != null) {
+      unawaited(
+        _competitionPresence.stopSharing(
+          ref: ref,
+          competitionId: widget.competitionId!,
+          uid: _uid,
+        ),
       );
     }
     _sub?.cancel();

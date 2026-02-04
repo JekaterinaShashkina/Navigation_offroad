@@ -41,7 +41,7 @@ class _CompetitionsPageState extends ConsumerState<CompetitionsPage> {
     return Scaffold(
       backgroundColor: backgroundMainColor,
       appBar: NewAppBar(
-        title: 'My competitions',
+        title: 'Competitions',
         onPressed: () => Navigator.pop(context),
         // если в твоём NewAppBar нет actions — оставь обычный AppBar ниже.
       ),
@@ -198,7 +198,6 @@ class _CompetitionsPageState extends ConsumerState<CompetitionsPage> {
     final q = _searchCtrl.text.trim().toLowerCase();
     if (q.isNotEmpty) {
       out = out.where((c) {
-        // !!! если у тебя поле не name — поменяй здесь
         final name = (c.name).toLowerCase();
         return name.contains(q);
       });
@@ -208,7 +207,7 @@ class _CompetitionsPageState extends ConsumerState<CompetitionsPage> {
   }
 }
 
-/// Search pill, похожий на макет
+/// Search pill
 class _SearchPill extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String>? onChanged;

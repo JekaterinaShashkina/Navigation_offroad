@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
-import 'package:offroad_nav/design/styles.dart';
 import 'package:offroad_nav/features/competition/domain/entities/competition.dart';
 
 class CompetitionInfoCard extends StatelessWidget {
@@ -11,6 +10,10 @@ class CompetitionInfoCard extends StatelessWidget {
 
   final bool canEdit;
   final VoidCallback? onEdit;
+  final VoidCallback? onOpenRoute;
+  final String adminLabel;
+  final bool canChangeAdmin;
+  final VoidCallback? onChangeAdmin;
 
   const CompetitionInfoCard({
     super.key,
@@ -19,6 +22,10 @@ class CompetitionInfoCard extends StatelessWidget {
     required this.participantCount,
     this.canEdit = false,
     this.onEdit,
+    this.onOpenRoute,
+    this.adminLabel = '—',
+    required this.canChangeAdmin,
+    this.onChangeAdmin,
   });
 
   @override
@@ -70,27 +77,68 @@ class CompetitionInfoCard extends StatelessWidget {
           ],
 
           const SizedBox(height: 10),
-          Text('Route: $routeTitle', style: const TextStyle(color: textHintColor)),
-
+          // Text('Route: $routeTitle', style: const TextStyle(color: textHintColor)),
+Row(
+  children: [
+    const Text('Route: ', style: TextStyle(color: textHintColor)),
+    InkWell(
+      onTap: onOpenRoute,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: buttonBackgroundColor,
+          borderRadius: BorderRadius.circular(10),
+          // border: Border.all(color: bgNightColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              routeTitle,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(width: 6),
+              // const Icon(Icons.open_in_new, size: 16, color: Colors.black54),
+          ],
+        ),
+      ),
+    ),
+  ],
+),
           const SizedBox(height: 4),
           Text(
-            '${formatCompetitionDate(competition.startAt)} - ${formatCompetitionDate(competition.endAt)}',
+            'Time: ${formatCompetitionDate(competition.startAt)} - ${formatCompetitionDate(competition.endAt)}',
             style: const TextStyle(color: textHintColor),
           ),
 
           const SizedBox(height: 4),
+          Text('Mode: $modeText', style: const TextStyle(color: textHintColor)),
+          const SizedBox(height: 4),
+          Text('Participants: $participantCount', style: const TextStyle(color: textHintColor)),
+          const SizedBox(height: 4),
           Row(
             children: [
-              _InfoPill(label: 'Mode: $modeText'),
+              Text('Admin: $adminLabel', style: const TextStyle(color: textHintColor)),
+              const Spacer(),
+              if (canChangeAdmin && onChangeAdmin != null)
+                InkWell(
+                  onTap: onChangeAdmin,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: buttonSecondBackgroundColor,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE6E6EA)),
+                    ),
+                    child: const Text('Change', style: TextStyle(fontWeight: FontWeight.w700, color: surfaceColor)),
+                  ),
+                ),
             ],
           ),
-
-          Text('Participants: $participantCount', style: const TextStyle(color: textHintColor)),
-
-          const SizedBox(height: 12),
-          const Text('Rules', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
-          Text(competition.rulesText, style: hintTextStyle.copyWith(color: Colors.black)),
+          Text('Rules: ${competition.rulesText}', style: TextStyle(color: textHintColor)),
         ],
       ),
     );
@@ -121,24 +169,6 @@ class _StatusBadge extends StatelessWidget {
         border: Border.all(color: const Color(0xFFD9CFEA)),
       ),
       child: Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
-    );
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  final String label;
-  const _InfoPill({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F0FA),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9CFEA)),
-      ),
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
     );
   }
 }

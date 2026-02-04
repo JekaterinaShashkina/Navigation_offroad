@@ -11,7 +11,7 @@ import 'package:offroad_nav/features/friends/data/repositories/friends_repositor
 import 'package:offroad_nav/features/friends/presentation/pages/chat_page.dart';
 
 // экраны
-import 'my_friends_page.dart';
+import '../../../home/presentation/pages/notifications_page.dart';
 import 'send_invite_page.dart';
 
 const kPersonAddSvg = 'assets/images/person_add.svg';
@@ -78,7 +78,7 @@ class _FriendsPageState extends State<FriendsPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const MyFriendsPage(),
+                          builder: (_) => const NotificationsPage(),
                         ),
                       );
                     },

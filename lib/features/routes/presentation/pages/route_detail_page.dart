@@ -18,6 +18,7 @@ class RouteDetailPage extends StatefulWidget {
 
   final TrackingMode mode;        // ✅
   final Future<void> Function()? onGo; // ✅ кастомная логика (competition)
+  final bool showGo;
 
   const RouteDetailPage({
     super.key,
@@ -27,6 +28,7 @@ class RouteDetailPage extends StatefulWidget {
     this.routeId,
     this.mode = TrackingMode.live,
     this.onGo,
+    this.showGo = true,
   });
 
   @override
@@ -225,9 +227,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             child: NavigationBottomPanel(
               timeText: timeText,
               distanceText: distanceText,
-              showPrimaryButton: true,
+              showPrimaryButton: widget.showGo,
               // СИМУЛЯЦИЯ
-              onGo: ()async{
+              onGo: widget.showGo ? ()async{
                 if (widget.onGo != null) {
                   await widget.onGo!();
                   return;
@@ -244,7 +246,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                     ),
                   ),
                 );
-              },
+              }: null,
               onClose: () => Navigator.pop(context),
             ),
           ),

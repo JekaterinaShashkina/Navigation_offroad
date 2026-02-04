@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:offroad_nav/features/routes/domain/entities/completed_route_entity.dart';
 import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
-import 'package:offroad_nav/features/routes/presentation/widgets/accordion_card.dart';
+import 'package:offroad_nav/design/widgets/accordion_card.dart';
 
 typedef RouteCardBuilder = Widget Function(RouteEntity route);
 typedef CompletedCardBuilder = Widget Function(CompletedRouteEntity item);
