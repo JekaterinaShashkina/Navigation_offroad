@@ -1,6 +1,7 @@
 // lib/features/competitions/data/competitions_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:offroad_nav/features/competition/domain/entities/competition.dart';
 import 'package:offroad_nav/features/competition/domain/entities/competition_attempt.dart';
 import 'package:offroad_nav/features/competition/domain/entities/competition_participant.dart';
@@ -89,9 +90,13 @@ class CompetitionsRepository {
       'createdAt': now,
       'updatedAt': now,
     });
+      // ✅ RTDB meta (нужно для правил)
+      await FirebaseDatabase.instance
+          .ref('competition_meta/${doc.id}')
+          .set({'adminId': uid});
 
-    return doc.id;
-  }
+      return doc.id;
+    }
 
   Future<void> updateCompetition(
     String competitionId,
@@ -318,11 +323,15 @@ Future<void> updateCompetitionAdmin({
   required String adminName,
 }) async {
   _requireUser();
+
   await _col.doc(competitionId).update({
     'adminId': adminId,
     'adminName': adminName,
     'updatedAt': FieldValue.serverTimestamp(),
   });
+    await FirebaseDatabase.instance
+      .ref('competition_meta/$competitionId')
+      .update({'adminId': adminId});
 }
 
 }

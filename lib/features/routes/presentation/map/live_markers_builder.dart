@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:offroad_nav/design/widgets/avatar_marker_factory.dart';
 import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
 
-typedef WarmUpAvatars = void Function(List<LiveUserView> users);
+typedef WarmUpAvatars = Future<void> Function(List<LiveUserView> users);
 
 const _crownAnchor = Offset(0.5, 2.3);
 
@@ -24,7 +23,7 @@ Set<Marker> buildLiveMarkers({
   final markers = <Marker>{};
   for (final u in users) {
     if (!includeMe && myUid != null && u.userId == myUid) continue;
-    final icon = avatarIcons[u.userId] ?? AvatarMarkerFactory.I.defaultIcon;
+    final icon = avatarIcons[u.userId] ?? BitmapDescriptor.defaultMarker;
     // final rotation = _smoothedHeading(u.userId, u.heading);
     markers.add(
       Marker(

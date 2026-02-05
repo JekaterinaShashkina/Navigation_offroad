@@ -226,6 +226,7 @@ class CompetitionViewPage extends ConsumerWidget {
                           competitionId: competitionId,
                           routePoints: pts,
                           routeName: route.name,
+                          leaderId: competition.adminId,
                         ),
                       ),
                     );

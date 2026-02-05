@@ -5,8 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:offroad_nav/core/result.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
+import 'package:offroad_nav/design/widgets/avatar_icon_cache.dart';
 import 'package:offroad_nav/design/widgets/avatar_marker_factory.dart';
 import 'package:offroad_nav/features/competition/presentation/services/competition_presence_service.dart';
 import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
@@ -34,8 +36,7 @@ import '../tracking/controllers/route_tracking_controller.dart';
 
 // ✅ UI панели
 
-enum TrackingMode { simulated, live, competition  }
-
+enum TrackingMode { simulated, live, competition }
 
 class TrackingResult {
   final DateTime startedAt;
@@ -59,18 +60,17 @@ class TrackingResult {
   int get durationSec => finishedAt.difference(startedAt).inSeconds;
 }
 
-
 class RouteTrackingPage extends ConsumerStatefulWidget {
   final List<LatLng> points;
   final TrackingMode mode;
+
   /// Если null — одиночный режим (без live-участников).
   final String? groupId;
   final String? routeId;
   final String routeName;
   final Future<void> Function(TrackingResult result)? onFinish;
   final Future<void> Function()? onCancel;
-    final String? competitionId;
-
+  final String? competitionId;
 
   const RouteTrackingPage({
     super.key,
@@ -82,7 +82,6 @@ class RouteTrackingPage extends ConsumerStatefulWidget {
     this.onFinish,
     this.onCancel,
     this.competitionId,
-
   });
 
   @override
@@ -94,8 +93,11 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
   final _iconsLoader = MapIconsLoader();
   BitmapDescriptor? _arrowIcon;
   BitmapDescriptor? _crownIcon;
+
   /// кэш иконок аватаров для маркеров
-  final Map<String, BitmapDescriptor> _avatarIcons = {};
+  // final Map<String, BitmapDescriptor> _avatarIcons = {};
+  final _avatarCache = AvatarIconCache(size: 240);
+
   // tracking sources
   late final ITrackingSource _source;
   StreamSubscription<TrackSample>? _sub;
@@ -191,18 +193,22 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         );
       }
 
-      if (widget.mode == TrackingMode.competition && widget.competitionId != null) {
-          unawaited(
-            _competitionPresence.send(
-              ref: ref,
-              competitionId: widget.competitionId!,
-              uid: _uid,
-              pos: s.pos,
-              bearing: _progress.state.bearingDeg,
-              accuracyM: s.accuracyM ?? 0,
-            ),
+      if (widget.mode == TrackingMode.competition &&
+          widget.competitionId != null) {
+        try {
+          await _competitionPresence.send(
+            ref: ref,
+            competitionId: widget.competitionId!,
+            uid: _uid,
+            pos: s.pos,
+            bearing: _progress.state.bearingDeg,
+            accuracyM: s.accuracyM ?? 0,
           );
+          debugPrint('RTDB OK');
+        } catch (e) {
+          debugPrint('RTDB ERROR: $e');
         }
+      }
 
       // перерисовка UI
       if (mounted) setState(() {});
@@ -228,7 +234,8 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         _presence.stopSharing(ref: ref, groupId: widget.groupId, uid: _uid),
       );
     }
-    if (widget.mode == TrackingMode.competition && widget.competitionId != null) {
+    if (widget.mode == TrackingMode.competition &&
+        widget.competitionId != null) {
       unawaited(
         _competitionPresence.stopSharing(
           ref: ref,
@@ -319,21 +326,25 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
 
   /// Для аватаров: прогреваем (генерим) BitmapDescriptor заранее.
   Future<void> _warmUpAvatars(List<LiveUserView> users) async {
-    bool changed = false;
-    for (final u in users) {
-      if (_avatarIcons.containsKey(u.userId)) continue;
+    // bool changed = false;
+    // for (final u in users) {
+    //   if (_avatarIcons.containsKey(u.userId)) continue;
 
-      try {
-        final icon = await AvatarMarkerFactory.I.get(
-          userId: u.userId,
-          photoUrlOrAsset: u.img, // ✅ у тебя поле img
-          size: 240,
-        );
-        _avatarIcons[u.userId] = icon;
-        changed = true;
-      } catch (e) {
-        debugPrint('❌ avatar failed for ${u.name}: $e'); // ✅ у тебя поле name
-      }
+    //   try {
+    //     final icon = await AvatarMarkerFactory.I.get(
+    //       userId: u.userId,
+    //       photoUrlOrAsset: u.img, // ✅ у тебя поле img
+    //       size: 240,
+    //     );
+    //     _avatarIcons[u.userId] = icon;
+    //     changed = true;
+    //   } catch (e) {
+    //     debugPrint('❌ avatar failed for ${u.name}: $e'); // ✅ у тебя поле name
+    //   }
+    // }
+    final changed = await _avatarCache.warmUp(users);
+    for (final u in users) {
+      debugPrint('❌ LIVE: ${u.userId} name=${u.name} img=${u.img}');
     }
     if (changed && mounted) setState(() {});
   }
@@ -374,10 +385,9 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         traversedPoints.addAll(widget.points.sublist(startIdx, startIdx + 2));
       }
     }
-    
+
     final isPaused = false; // пока заглушка, потом подключим
     final isCompetition = widget.mode == TrackingMode.competition;
-
 
     final actions = <ActionButtonConfig>[
       ActionButtonConfig(
@@ -387,7 +397,7 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         filled: true, // сделаем главной
         enabled: started,
       ),
-        if (isCompetition)
+      if (isCompetition)
         ActionButtonConfig(
           label: 'Cancel',
           iconData: Icons.close,
@@ -446,7 +456,7 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
         return buildLiveMarkers(
           users: online,
           warmUpAvatars: _warmUpAvatars,
-          avatarIcons: _avatarIcons,
+          avatarIcons: _avatarCache.map,
           myUid: _uid,
           leaderId: ownerAsync.asData?.value,
           crownIcon: _crownIcon,
@@ -475,167 +485,183 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
             ),
           };
 
-    return Scaffold(
-      appBar: NewAppBar(
-        title: "Route tracking",
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            mapType: MapType.hybrid,
-            mapToolbarEnabled: false,
-            myLocationButtonEnabled: false,
-            compassEnabled: false,
-            initialCameraPosition: CameraPosition(
-              target: widget.points.isNotEmpty
-                  ? widget.points.first
-                  : const LatLng(59.4370, 24.7536),
-              zoom: 16,
-            ),
-            markers: {...routeMarkers, ...liveMarkers, ...myMarker},
-            polylines: {routePolyline, traversedPolyline},
-            onMapCreated: (c) => _controller = c,
-          ),
+    return PopScope(
+      canPop: widget.mode != TrackingMode.competition,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
 
-          // follow leader button (только если мы в группе)
-          if (gid != null && widget.mode == TrackingMode.live)
-            Positioned(
-              right: padding16,
-              bottom: 140, // ← подбирается под + / − (можно 130–160)
-              child: Tooltip(
-                message: _leader.state.followLeader
-                    ? 'Stop following leader'
-                    : 'Follow leader',
-                child: GestureDetector(
-                  onTap: _toggleFollowLeader,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: _leader.state.followLeader
-                          ? buttonBackgroundColor
-                          : Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      _leader.state.followLeader
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: Colors.white,
-                      size: 24,
+        if (widget.mode == TrackingMode.competition) {
+          await _cancelAttempt();
+        }
+      },
+      child: Scaffold(
+        appBar: NewAppBar(
+          title: "Route tracking",
+          onPressed: () async {
+            if (widget.mode == TrackingMode.competition) {
+              await _cancelAttempt(); // ✅ покажет диалог и вызовет widget.onCancel
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        body: Stack(
+          children: [
+            GoogleMap(
+              mapType: MapType.hybrid,
+              mapToolbarEnabled: false,
+              myLocationButtonEnabled: false,
+              compassEnabled: false,
+              initialCameraPosition: CameraPosition(
+                target: widget.points.isNotEmpty
+                    ? widget.points.first
+                    : const LatLng(59.4370, 24.7536),
+                zoom: 16,
+              ),
+              markers: {...routeMarkers, ...liveMarkers, ...myMarker},
+              polylines: {routePolyline, traversedPolyline},
+              onMapCreated: (c) => _controller = c,
+            ),
+
+            // follow leader button (только если мы в группе)
+            if (gid != null && widget.mode == TrackingMode.live)
+              Positioned(
+                right: padding16,
+                bottom: 140, // ← подбирается под + / − (можно 130–160)
+                child: Tooltip(
+                  message: _leader.state.followLeader
+                      ? 'Stop following leader'
+                      : 'Follow leader',
+                  child: GestureDetector(
+                    onTap: _toggleFollowLeader,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _leader.state.followLeader
+                            ? buttonBackgroundColor
+                            : Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 6,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _leader.state.followLeader
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
               ),
+            // start gate hint
+            // if (showGateBanner)
+            Positioned(
+              left: padding16,
+              right: padding16,
+              top: padding12,
+              child: TrackingInfoBar(
+                started: started,
+                distToStartM: distToStart,
+                traversedMeters: st.traversedMeters,
+                remainingMeters: st.remainingMeters,
+                eta: st.eta,
+                elapsed: elapsed,
+              ),
             ),
-          // start gate hint
-          // if (showGateBanner)
-          Positioned(
-            left: padding16,
-            right: padding16,
-            top: padding12,
-            child: TrackingInfoBar(
-              started: started,
-              distToStartM: distToStart,
-              traversedMeters: st.traversedMeters,
-              remainingMeters: st.remainingMeters,
-              eta: st.eta,
-              elapsed: elapsed,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 24,
+              child: RouteActionBar(actions: actions),
             ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 24,
-            child: RouteActionBar(actions: actions),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Future<void> _finishTracking() async {
-  final st = _progress.state;
+    final st = _progress.state;
 
-  if (!st.started || st.startTime == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('You have not started yet')),
-    );
-    return;
-  }
-
-  final finishedAt = DateTime.now();
-  final startedAt = st.startTime!;
-
-  final profile = ref.read(trackingProfileProvider);
-
-  final startIdx = st.startIndex.clamp(0, widget.points.length - 1);
-  final endIdx = st.closestIndex.clamp(startIdx, widget.points.length - 1);
-
-  final distanceM = st.traversedMeters;
-
-  final traversed = (endIdx > startIdx)
-      ? widget.points.sublist(startIdx, endIdx + 1)
-      : <LatLng>[];
-
-  final result = TrackingResult(
-    startedAt: startedAt,
-    finishedAt: finishedAt,
-    startIndex: startIdx,
-    endIndex: endIdx,
-    distanceMeters: distanceM,
-    traversedPolyline: traversed,
-    profileName: profile.name,
-  );
-
-  try {
-    // ✅ 1) Если передали onFinish — значит “особый режим” (например competition)
-    if (widget.onFinish != null) {
-      await widget.onFinish!(result);
-
-      if (!mounted) return;
-      Navigator.pop(context);
+    if (!st.started || st.startTime == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('You have not started yet')));
       return;
     }
 
-    // ✅ 2) Обычный режим: сохраняем completed как раньше
-    await _completedRepo.saveCompletedRoute(
-      userId: _uid,
-      profileName: profile.name,
+    final finishedAt = DateTime.now();
+    final startedAt = st.startTime!;
+
+    final profile = ref.read(trackingProfileProvider);
+
+    final startIdx = st.startIndex.clamp(0, widget.points.length - 1);
+    final endIdx = st.closestIndex.clamp(startIdx, widget.points.length - 1);
+
+    final distanceM = st.traversedMeters;
+
+    final traversed = (endIdx > startIdx)
+        ? widget.points.sublist(startIdx, endIdx + 1)
+        : <LatLng>[];
+
+    final result = TrackingResult(
       startedAt: startedAt,
       finishedAt: finishedAt,
-      distanceMeters: distanceM,
       startIndex: startIdx,
       endIndex: endIdx,
+      distanceMeters: distanceM,
       traversedPolyline: traversed,
-      mode: widget.groupId == null ? 'solo' : 'group',
-      groupId: widget.groupId,
-      routeId: widget.routeId,
-      routeName: widget.routeName,
+      profileName: profile.name,
     );
 
-    if (!mounted) return;
+    try {
+      // ✅ 1) Если передали onFinish — значит “особый режим” (например competition)
+      if (widget.onFinish != null) {
+        await widget.onFinish!(result);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Route saved')),
-    );
+        if (!mounted) return;
+        Navigator.pop(context);
+        return;
+      }
 
-    Navigator.pop(context);
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to save: $e')),
-    );
+      // ✅ 2) Обычный режим: сохраняем completed как раньше
+      await _completedRepo.saveCompletedRoute(
+        userId: _uid,
+        profileName: profile.name,
+        startedAt: startedAt,
+        finishedAt: finishedAt,
+        distanceMeters: distanceM,
+        startIndex: startIdx,
+        endIndex: endIdx,
+        traversedPolyline: traversed,
+        mode: widget.groupId == null ? 'solo' : 'group',
+        groupId: widget.groupId,
+        routeId: widget.routeId,
+        routeName: widget.routeName,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Route saved')));
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+    }
   }
-}
 
   void _togglePause() {
     ScaffoldMessenger.of(
@@ -650,49 +676,54 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
       backgroundColor: Colors.transparent,
       builder: (_) => TrackingSettingsSheet(
         onApplyProfile: (p) async {
-        // обновляем выбранный профиль в приложении
-        ref.read(trackingProfileProvider.notifier).set(p);
+          // обновляем выбранный профиль в приложении
+          ref.read(trackingProfileProvider.notifier).set(p);
 
-        // применяем настройки GPS только если это live
-        if (widget.mode != TrackingMode.simulated && _source is LiveTrackingSource) {
-          await (_source as LiveTrackingSource).applyProfile(p);
-        }
+          // применяем настройки GPS только если это live
+          if (widget.mode != TrackingMode.simulated &&
+              _source is LiveTrackingSource) {
+            await (_source as LiveTrackingSource).applyProfile(p);
+          }
         },
       ),
     );
   }
-  
+
   Future<void> _cancelAttempt() async {
-  if (widget.onCancel == null) {
-    Navigator.pop(context);
-    return;
-  }
+    if (widget.onCancel == null) {
+      Navigator.pop(context);
+      return;
+    }
 
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('Cancel attempt?'),
-      content: const Text('Progress will not be saved.'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep going')),
-        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancel')),
-      ],
-    ),
-  );
-
-  if (ok != true) return;
-
-  try {
-    await widget.onCancel!();
-    if (!mounted) return;
-    Navigator.pop(context);
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to cancel: $e')),
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cancel attempt?'),
+        content: const Text('Progress will not be saved.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep going'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
     );
+
+    if (ok != true) return;
+
+    try {
+      await widget.onCancel!();
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to cancel: $e')));
+    }
   }
 }
-
-}
-
