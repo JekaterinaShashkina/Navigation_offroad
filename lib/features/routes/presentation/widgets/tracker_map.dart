@@ -11,13 +11,16 @@ class TrackerMap extends StatefulWidget {
     required this.controller,
     this.arrowIcon,
     this.bottomPadding = 0,
-    this.lookAheadMeters = 140, // сколько "заглядывать" вперёд по курсу
+    this.lookAheadMeters = 140, 
+    this.onMapCreated, 
+
   });
 
   final TrackerController controller;
   final BitmapDescriptor? arrowIcon;
   final double bottomPadding;
   final double lookAheadMeters;
+  final void Function(GoogleMapController controller)? onMapCreated;
 
   @override
   State<TrackerMap> createState() => _TrackerMapState();
@@ -126,12 +129,17 @@ class _TrackerMapState extends State<TrackerMap> {
 
     return GoogleMap(
       mapType: MapType.hybrid,
+      mapToolbarEnabled: false,     // ✅ уберёт две кнопки под +/-
+      zoomControlsEnabled: false,   // ✅ уберёт +/-
+      compassEnabled: false,        // по желанию
+      myLocationButtonEnabled: false, 
       initialCameraPosition: CameraPosition(
         target: pos ?? const LatLng(59.0, 26.0),
         zoom: 15,
       ),
       onMapCreated: (c) {
         _map = c;
+        widget.onMapCreated?.call(c);
         if (pos != null) {
           // сразу поставить камеру в адекватную позу
           final target = _offsetAhead(
@@ -151,15 +159,13 @@ class _TrackerMapState extends State<TrackerMap> {
           );
         }
       },
+      
       markers: markers,
       polylines: polylines,
       padding: EdgeInsets.only(bottom: widget.bottomPadding),
       myLocationEnabled: false,
-      myLocationButtonEnabled: false,
-      compassEnabled: false,
       rotateGesturesEnabled: true,
       tiltGesturesEnabled: true,
-      zoomControlsEnabled: false,
     );
   }
 }

@@ -49,6 +49,10 @@ void initState() {
           GoogleMap(
             initialCameraPosition: _initialPosition,
             mapType: MapType.hybrid,
+            mapToolbarEnabled: false,     
+            zoomControlsEnabled: false,   
+            compassEnabled: false,        
+            myLocationButtonEnabled: false, 
             onMapCreated: (controller) => _controller.complete(controller),
           ),
           // Белая панель с аватаркой

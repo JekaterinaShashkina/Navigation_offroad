@@ -2,7 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/features/routes/domain/entities/route_entity.dart';
+import 'package:offroad_nav/features/routes/presentation/map/map_camera_actions.dart';
+import 'package:offroad_nav/features/routes/presentation/map/map_quick_controls.dart';
 
 import '../../../../design/colors.dart';
 import '../../../../design/widgets/app_bar.dart';
@@ -105,36 +108,36 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
-  // кнопка "центрировать" — центр на старте маршрута
-  void _centerCamera() {
-  if (_mapController == null) return;
+  // // кнопка "центрировать" — центр на старте маршрута
+  // void _centerCamera() {
+  // if (_mapController == null) return;
 
-  _mapController!.animateCamera(
-    CameraUpdate.newCameraPosition(
-      CameraPosition(
-        target: _routePoints.first,
-        zoom: 17,
-        tilt: 60,      // если нужен наклон
-        bearing: 0, // если есть расчёт курса
-      ),
-    ),
-  );
-  }
+  // _mapController!.animateCamera(
+  //   CameraUpdate.newCameraPosition(
+  //     CameraPosition(
+  //       target: _routePoints.first,
+  //       zoom: 17,
+  //       tilt: 60,      // если нужен наклон
+  //       bearing: 0, // если есть расчёт курса
+  //     ),
+  //   ),
+  // );
+  // }
 
 
-  // кнопка "на север"
-  void _faceNorth() {
-    if (_mapController == null || _routePoints.isEmpty) return;
-    _mapController!.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: _routePoints.first,
-          zoom: 17,
-          bearing: 0, // поворот на север
-        ),
-      ),
-    );
-  }
+  // // кнопка "на север"
+  // void _faceNorth() {
+  //   if (_mapController == null || _routePoints.isEmpty) return;
+  //   _mapController!.animateCamera(
+  //     CameraUpdate.newCameraPosition(
+  //       CameraPosition(
+  //         target: _routePoints.first,
+  //         zoom: 17,
+  //         bearing: 0, // поворот на север
+  //       ),
+  //     ),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +176,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         children: [
           // 1. Карта
           GoogleMap(
-            mapType: MapType.hybrid,
+              mapType: MapType.hybrid,
+              mapToolbarEnabled: false,     // ✅ уберёт две кнопки под +/-
+              zoomControlsEnabled: false,   // ✅ уберёт +/-
+              compassEnabled: false,        // по желанию
+              myLocationButtonEnabled: false, 
               padding: const EdgeInsets.only(
                 bottom: 160, // поднимет "геометрический" центр карты выше низа
                 top: 40,     // можно чуть-чуть, чтобы не упираться в appBar
@@ -209,15 +216,26 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             },
           ),
 
-          // 2. Кнопки справа (центр/север)
-          Positioned(
-            right: 16,
-            top: 100,
-            child: MapRightButtons(
-              onCenter: _centerCamera,
-              onNorth: _faceNorth,
-            ),
+                  // 2. Кнопки справа (центр/север)
+      Positioned(
+        right: padding16,
+        bottom: 200, 
+        child: MapQuickControls(
+          onCenter: () => MapCameraActions.centerOn(
+            controller: _mapController,
+            target: _routePoints.isNotEmpty ? _routePoints.first : null,
+            zoom: 17,
+            tilt: 60,
+            bearing: 0,
           ),
+          onNorth: () => MapCameraActions.faceNorth(
+            controller: _mapController,
+            keepTarget: _routePoints.isNotEmpty ? _routePoints.first : null,
+            zoom: 17,
+            tilt: 60,
+          ),
+        ),
+      ),
 
           // 3. Нижняя панель с названием, временем, расстоянием и кнопкой GO
           Positioned(

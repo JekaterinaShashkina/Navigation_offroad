@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:offroad_nav/features/routes/presentation/map/map_camera_actions.dart';
+import 'package:offroad_nav/features/routes/presentation/map/map_quick_controls.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../design/images.dart';
@@ -22,13 +24,15 @@ class RouteCreationPage extends StatefulWidget {
 
 class _RouteCreationPageState extends State<RouteCreationPage> {
   final _ctrl = TrackerController();
-  final _routesRepo = RoutesRepository();          // <-- репозиторий
+  final _routesRepo = RoutesRepository(); // <-- репозиторий
 
-   // размеры нижней панели (для паддинга карты)
+  // размеры нижней панели (для паддинга карты)
   static const double _panelHeight = 70;
   static const double _panelBottom = 45;
 
   BitmapDescriptor? _customMarkerIcon;
+  GoogleMapController? _map;
+  bool _showRestricted = false;
 
   @override
   void initState() {
@@ -38,15 +42,15 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
     _ctrl.start();
   }
 
- Future<void> _loadCustomMarker() async {
-  final bitmap = await MarkerIcon.fromPngAsset(
-    'assets/images/navigation_arrow.png',
-    widthPx: 36,
-    heightPx: 36,
-  );
+  Future<void> _loadCustomMarker() async {
+    final bitmap = await MarkerIcon.fromPngAsset(
+      'assets/images/navigation_arrow.png',
+      widthPx: 36,
+      heightPx: 36,
+    );
 
-  if (!mounted) return;
-  setState(() => _customMarkerIcon = bitmap);
+    if (!mounted) return;
+    setState(() => _customMarkerIcon = bitmap);
   }
 
   @override
@@ -59,61 +63,61 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
   Future<void> _save() async {
     if (_ctrl.track.length < 2) return;
 
-  final nameController = TextEditingController();
-  final name = await showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Save Route'),
-      content: TextField(
-        controller: nameController,
-        autofocus: true,
-        decoration: const InputDecoration(hintText: 'Enter name'),
+    final nameController = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save Route'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Enter name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
-          child: const Text('Save'),
-        ),
-      ],
-    ),
-  );
+    );
 
-  if (name == null || name.isEmpty) return;
+    if (name == null || name.isEmpty) return;
 
-  // считаем длину
-  double lengthKm = 0;
-  for (int i = 0; i + 1 < _ctrl.track.length; i++) {
-    lengthKm += distanceM(_ctrl.track[i], _ctrl.track[i + 1]) / 1000.0;
-  }
-  lengthKm = double.parse(lengthKm.toStringAsFixed(3));
+    // считаем длину
+    double lengthKm = 0;
+    for (int i = 0; i + 1 < _ctrl.track.length; i++) {
+      lengthKm += distanceM(_ctrl.track[i], _ctrl.track[i + 1]) / 1000.0;
+    }
+    lengthKm = double.parse(lengthKm.toStringAsFixed(3));
 
-  final uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
-  final entity = RouteEntity(
-    id: '', // id проставит Firestore, мы его вернём из saveRoute при желании
-    ownerId: uid,
-    name: name,
-    points: _ctrl.track
-        .map((p) => RoutePoint(p.latitude, p.longitude))
-        .toList(),
-    isPublic: false,        // по умолчанию приватный
-    createdAt: DateTime.now(),
-    lengthKm: lengthKm,
-  );
+    final entity = RouteEntity(
+      id: '', // id проставит Firestore, мы его вернём из saveRoute при желании
+      ownerId: uid,
+      name: name,
+      points: _ctrl.track
+          .map((p) => RoutePoint(p.latitude, p.longitude))
+          .toList(),
+      isPublic: false, // по умолчанию приватный
+      createdAt: DateTime.now(),
+      lengthKm: lengthKm,
+    );
 
-  await _routesRepo.saveRoute(entity);
+    await _routesRepo.saveRoute(entity);
 
-  if (!mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Route saved')),
-  );
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Route saved')));
 
-  _ctrl.clearTrack();
+    _ctrl.clearTrack();
   }
 
   @override
@@ -132,22 +136,48 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
             controller: _ctrl,
             bottomPadding: bottomPadding,
             arrowIcon: _customMarkerIcon,
-            lookAheadMeters: 0, 
+            lookAheadMeters: 0,
+            onMapCreated: (c) => _map = c,
           ),
 
-          // Re-center
+            // // Re-center
+            // Positioned(
+            //   right: 16,
+            //   top: 16,
+            //   child: SafeArea(
+            //     bottom: false,
+            //     child: FloatingActionButton.small(
+            //       backgroundColor: Colors.black87,
+            //       onPressed: () {
+            //         _ctrl.followMe = true;
+            //         setState(() {});
+            //       },
+            //       child: const Icon(Icons.my_location, color: Colors.white),
+            //     ),
+            //   ),
+            // ),
+          // Quick controls справа (центр / север)
           Positioned(
             right: 16,
-            top: 16,
+            bottom: 200,
             child: SafeArea(
               bottom: false,
-              child: FloatingActionButton.small(
-                backgroundColor: Colors.black87,
-                onPressed: () {
-                  _ctrl.followMe = true;
-                  setState(() {});
-                },
-                child: const Icon(Icons.my_location, color: Colors.white),
+              child: MapQuickControls(
+                onCenter: () => MapCameraActions.centerOn(
+                  controller: _map,
+                  target: _ctrl.track.isNotEmpty ? _ctrl.track.first : null,
+                  zoom: 17,
+                  tilt: 60,
+                  bearing: 0,
+                ),
+                onNorth: () => MapCameraActions.faceNorth(
+                  controller: _map,
+                  keepTarget: _ctrl.track.isNotEmpty ? _ctrl.track.first : null,
+                  zoom: 17,
+                  tilt: 60,
+                ),
+                onToggleRestricted: () => setState(() => _showRestricted = !_showRestricted),
+                  restrictedEnabled: _showRestricted,
               ),
             ),
           ),
@@ -176,8 +206,9 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
                           ),
                           ActionButtonConfig(
                             label: _ctrl.isRecording ? 'Pause' : 'Go',
-                            iconWidget:
-                                _ctrl.isRecording ? pauseIconNavigation : goIconNavigation,
+                            iconWidget: _ctrl.isRecording
+                                ? pauseIconNavigation
+                                : goIconNavigation,
                             onTap: () async {
                               debugPrint('🔥🔥🔥 GO BUTTON TAP (UI)');
                               if (_ctrl.isRecording) {
@@ -192,7 +223,9 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
                           ActionButtonConfig(
                             label: 'Delete',
                             iconWidget: deleteIconNavigation,
-                            onTap: _ctrl.track.isNotEmpty ? _ctrl.clearTrack : null,
+                            onTap: _ctrl.track.isNotEmpty
+                                ? _ctrl.clearTrack
+                                : null,
                             enabled: _ctrl.track.isNotEmpty,
                             filled: false,
                           ),

@@ -137,7 +137,7 @@ class _ChatPageState extends State<ChatPage> {
                 final docs = snap.data?.docs ?? const [];
                 if (docs.isEmpty) {
                   return const Center(
-                    child: Text('Start chatting', style: hintTextStyle),
+                    child: Text('Under construction', style: hintTextStyle),
                   );
                 }
 

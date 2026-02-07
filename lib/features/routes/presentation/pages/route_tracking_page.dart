@@ -13,7 +13,10 @@ import 'package:offroad_nav/features/groups/application/providers/groups_provide
 import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
 import 'package:offroad_nav/features/routes/data/repositories/completed_route_repository.dart';
 import 'package:offroad_nav/features/routes/presentation/map/live_markers_builder.dart';
+import 'package:offroad_nav/features/routes/presentation/map/map_camera_actions.dart';
 import 'package:offroad_nav/features/routes/presentation/map/map_icons_loader.dart';
+import 'package:offroad_nav/features/routes/presentation/map/map_quick_controls.dart';
+import 'package:offroad_nav/features/routes/presentation/map/restricted_zones_loader.dart';
 import 'package:offroad_nav/features/routes/presentation/map/route_markers_builder.dart';
 import 'package:offroad_nav/features/routes/presentation/tracking/services/tracking_presence_service.dart';
 import 'package:offroad_nav/features/routes/presentation/tracking/settings/tracking_profile.dart';
@@ -112,6 +115,10 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
   late final CompletedRouteRepository _completedRepo;
   final _competitionPresence = CompetitionPresenceService();
 
+  bool _showRestricted = false;
+  Set<Polygon> _restrictedPolygons = {};
+  bool _restrictedLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -155,6 +162,8 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
       );
     }
 
+    _loadRestrictedZones();
+
     // ✅ старт трекинга
     _sub = _source.watch().listen((s) async {
       if (!mounted) return;
@@ -178,25 +187,27 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
       _updateCameraPosition(target: camTarget, bearing: camBearing);
 
       // ✅ RTDB live присутствие (только если groupId есть)
-if (widget.groupId != null && widget.mode == TrackingMode.live) {
-  debugPrint('✅ MODE=${widget.mode} groupId=${widget.groupId} uid=$_uid');
-  unawaited(() async {
-    try {
-      await _presence.send(
-        ref: ref,
-        pos: s.pos,
-        groupId: widget.groupId,
-        uid: _uid,
-        bearing: _progress.state.bearingDeg,
-        accuracyM: s.accuracyM,
-      );
-      debugPrint('✅ groups_live send OK groupId=${widget.groupId} uid=$_uid');
-    } catch (e, st) {
-      debugPrint('❌ groups_live send ERROR: $e');
-      debugPrintStack(stackTrace: st);
-    }
-  }());
-}
+      if (widget.groupId != null && widget.mode == TrackingMode.live) {
+        debugPrint('✅ MODE=${widget.mode} groupId=${widget.groupId} uid=$_uid');
+        unawaited(() async {
+          try {
+            await _presence.send(
+              ref: ref,
+              pos: s.pos,
+              groupId: widget.groupId,
+              uid: _uid,
+              bearing: _progress.state.bearingDeg,
+              accuracyM: s.accuracyM,
+            );
+            debugPrint(
+              '✅ groups_live send OK groupId=${widget.groupId} uid=$_uid',
+            );
+          } catch (e, st) {
+            debugPrint('❌ groups_live send ERROR: $e');
+            debugPrintStack(stackTrace: st);
+          }
+        }());
+      }
 
       if (widget.mode == TrackingMode.competition &&
           widget.competitionId != null) {
@@ -229,6 +240,23 @@ if (widget.groupId != null && widget.mode == TrackingMode.live) {
       _crownIcon = crown;
     });
   }
+
+Future<void> _loadRestrictedZones() async {
+  if (_restrictedLoading || _restrictedPolygons.isNotEmpty) return;
+  _restrictedLoading = true;
+
+  try {
+    final polys = await RestrictedZonesLoader.loadFromAsset(
+      'assets/geo/kr_kaitseala.geojson',
+    );
+    if (!mounted) return;
+    setState(() => _restrictedPolygons = polys);
+  } catch (e) {
+    debugPrint('Restricted zones load failed: $e');
+  } finally {
+    _restrictedLoading = false;
+  }
+}
 
   @override
   void dispose() {
@@ -453,7 +481,7 @@ if (widget.groupId != null && widget.mode == TrackingMode.live) {
       },
       loading: () => <Marker>{},
       error: (e, st) {
-        debugPrint('❌ liveUsersWithProfilesProvider error: $e');
+        // debugPrint('❌ liveUsersWithProfilesProvider error: $e');
         debugPrintStack(stackTrace: st);
         return <Marker>{};
       },
@@ -510,7 +538,43 @@ if (widget.groupId != null && widget.mode == TrackingMode.live) {
               markers: {...routeMarkers, ...liveMarkers, ...myMarker},
               polylines: {routePolyline, traversedPolyline},
               onMapCreated: (c) => _controller = c,
+              polygons: _showRestricted ? _restrictedPolygons : <Polygon>{},
             ),
+            Positioned(
+  right: padding16,
+  bottom: 200, // чтобы не пересекалось с action bar
+  child: MapQuickControls(
+    onCenter: () {
+      final target = _leader.state.followLeader
+          ? _leader.state.leaderPos
+          : _progress.state.currentPos;
+
+      MapCameraActions.centerOn(
+        controller: _controller,
+        target: target ?? (widget.points.isNotEmpty ? widget.points.first : null),
+        zoom: 18,
+        tilt: 60,
+        bearing: _leader.state.followLeader
+            ? (_leader.state.leaderHeading ?? _progress.state.bearingDeg)
+            : _progress.state.bearingDeg,
+      );
+    },
+    onNorth: () {
+      final target = _leader.state.followLeader
+          ? _leader.state.leaderPos
+          : _progress.state.currentPos;
+
+      MapCameraActions.faceNorth(
+        controller: _controller,
+        keepTarget: target ?? (widget.points.isNotEmpty ? widget.points.first : null),
+        zoom: 18,
+        tilt: 60,
+      );
+    },
+      onToggleRestricted: () => setState(() => _showRestricted = !_showRestricted),
+  restrictedEnabled: _showRestricted,
+  ),
+),
 
             // follow leader button (только если мы в группе)
             if (gid != null && widget.mode == TrackingMode.live)
@@ -550,6 +614,35 @@ if (widget.groupId != null && widget.mode == TrackingMode.live) {
                   ),
                 ),
               ),
+//               Positioned(
+//   right: padding16,
+//   bottom: 200, // подстрой под твои кнопки
+//   child: GestureDetector(
+//     onTap: () async {
+//       if (_restrictedPolygons.isEmpty) {
+//         await _loadRestrictedZones();
+//       }
+//       if (!mounted) return;
+//       setState(() => _showRestricted = !_showRestricted);
+//     },
+//     child: Container(
+//       width: 48,
+//       height: 48,
+//       decoration: BoxDecoration(
+//         color: _showRestricted ? buttonBackgroundColor : Colors.black.withOpacity(0.6),
+//         borderRadius: BorderRadius.circular(12),
+//         boxShadow: const [
+//           BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3)),
+//         ],
+//       ),
+//       child: Icon(
+//         Icons.warning_amber_rounded,
+//         color: Colors.white,
+//         size: 24,
+//       ),
+//     ),
+//   ),
+// ),
             // start gate hint
             // if (showGateBanner)
             Positioned(
