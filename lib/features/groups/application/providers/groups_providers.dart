@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -107,6 +108,7 @@ final liveUsersProvider = StreamProvider.autoDispose.family<List<LiveUserRtdb>, 
 final liveUsersWithProfilesProvider =
     StreamProvider.autoDispose.family<List<LiveUserView>, String>((ref, groupId) async* {
   final liveRepo = ref.watch(groupsLiveRepositoryProvider);
+  debugPrint('🟢 SUBSCRIBE groups_live for groupId=$groupId');
   final db = FirebaseFirestore.instance;
 
   // ✅ кеш профилей: userId -> data

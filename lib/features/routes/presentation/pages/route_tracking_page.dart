@@ -5,11 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:offroad_nav/core/result.dart';
 import 'package:offroad_nav/design/colors.dart';
 import 'package:offroad_nav/design/dimension.dart';
 import 'package:offroad_nav/design/widgets/avatar_icon_cache.dart';
-import 'package:offroad_nav/design/widgets/avatar_marker_factory.dart';
 import 'package:offroad_nav/features/competition/presentation/services/competition_presence_service.dart';
 import 'package:offroad_nav/features/groups/application/providers/groups_providers.dart';
 import 'package:offroad_nav/features/groups/presentation/models/live_user_view.dart';
@@ -180,18 +178,25 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
       _updateCameraPosition(target: camTarget, bearing: camBearing);
 
       // ✅ RTDB live присутствие (только если groupId есть)
-      if (widget.groupId != null && widget.mode == TrackingMode.live) {
-        unawaited(
-          _presence.send(
-            ref: ref,
-            pos: s.pos,
-            groupId: widget.groupId,
-            uid: _uid,
-            bearing: _progress.state.bearingDeg, // или s.bearingDeg
-            accuracyM: s.accuracyM,
-          ),
-        );
-      }
+if (widget.groupId != null && widget.mode == TrackingMode.live) {
+  debugPrint('✅ MODE=${widget.mode} groupId=${widget.groupId} uid=$_uid');
+  unawaited(() async {
+    try {
+      await _presence.send(
+        ref: ref,
+        pos: s.pos,
+        groupId: widget.groupId,
+        uid: _uid,
+        bearing: _progress.state.bearingDeg,
+        accuracyM: s.accuracyM,
+      );
+      debugPrint('✅ groups_live send OK groupId=${widget.groupId} uid=$_uid');
+    } catch (e, st) {
+      debugPrint('❌ groups_live send ERROR: $e');
+      debugPrintStack(stackTrace: st);
+    }
+  }());
+}
 
       if (widget.mode == TrackingMode.competition &&
           widget.competitionId != null) {
@@ -204,9 +209,9 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
             bearing: _progress.state.bearingDeg,
             accuracyM: s.accuracyM ?? 0,
           );
-          debugPrint('RTDB OK');
+          debugPrint('✅ RTDB OK');
         } catch (e) {
-          debugPrint('RTDB ERROR: $e');
+          debugPrint('❌ RTDB ERROR: $e');
         }
       }
 
@@ -326,25 +331,9 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
 
   /// Для аватаров: прогреваем (генерим) BitmapDescriptor заранее.
   Future<void> _warmUpAvatars(List<LiveUserView> users) async {
-    // bool changed = false;
-    // for (final u in users) {
-    //   if (_avatarIcons.containsKey(u.userId)) continue;
-
-    //   try {
-    //     final icon = await AvatarMarkerFactory.I.get(
-    //       userId: u.userId,
-    //       photoUrlOrAsset: u.img, // ✅ у тебя поле img
-    //       size: 240,
-    //     );
-    //     _avatarIcons[u.userId] = icon;
-    //     changed = true;
-    //   } catch (e) {
-    //     debugPrint('❌ avatar failed for ${u.name}: $e'); // ✅ у тебя поле name
-    //   }
-    // }
     final changed = await _avatarCache.warmUp(users);
     for (final u in users) {
-      debugPrint('❌ LIVE: ${u.userId} name=${u.name} img=${u.img}');
+      // debugPrint('❌ LIVE: ${u.userId} name=${u.name} img=${u.img}');
     }
     if (changed && mounted) setState(() {});
   }
@@ -464,7 +453,7 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
       },
       loading: () => <Marker>{},
       error: (e, st) {
-        debugPrint('liveUsersWithProfilesProvider error: $e');
+        debugPrint('❌ liveUsersWithProfilesProvider error: $e');
         debugPrintStack(stackTrace: st);
         return <Marker>{};
       },

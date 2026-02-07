@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'package:offroad_nav/features/routes/presentation/utils/route_math.dart';
@@ -25,6 +26,13 @@ class LiveUserRtdb {
 
   factory LiveUserRtdb.fromMap(String userId, Map<dynamic, dynamic> m) {
     double toD(v) => (v is int) ? v.toDouble() : (v as num).toDouble();
+    int? _toInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      // если вдруг прилетит ServerValue map — игнорим
+      return null;
+    }
 
     return LiveUserRtdb(
       userId: userId,
@@ -33,7 +41,7 @@ class LiveUserRtdb {
       heading: m['heading'] == null ? null : toD(m['heading']),
       speed: m['speed'] == null ? null : toD(m['speed']),
       accuracyM: m['accuracy'] == null ? null : toD(m['accuracy']),
-      updatedAtMs: (m['updatedAt'] as int?) ?? (m['updated_at'] as int?),
+      updatedAtMs: _toInt(m['updatedAtMs']) ?? _toInt(m['updatedAt']) ?? _toInt(m['updated_at']),
     );
   }
 }
@@ -63,9 +71,10 @@ class GroupsLiveRepository {
   /// слушаем всех живых юзеров группы
   Stream<List<LiveUserRtdb>> watchLiveUsers(String groupId) {
     final ref = _liveRef(groupId);
-
+  
   return ref.onValue.map((event) {
       final val = event.snapshot.value;
+      debugPrint('🟣 RTDB groups_live raw = $val');
       if (val == null) return <LiveUserRtdb>[];
 
       final map = val as Map<dynamic, dynamic>;
@@ -74,13 +83,16 @@ class GroupsLiveRepository {
       final res = <LiveUserRtdb>[];
 
       map.forEach((k, v) {
-        if (v is! Map<dynamic, dynamic>) return;
+        if (v is! Map) return;
 
         final uid = k.toString();
+        final data = Map<dynamic, dynamic>.from(v as Map);
+
         LiveUserRtdb raw;
         try {
-          raw = LiveUserRtdb.fromMap(uid, v);
-        } catch (_) {
+          raw = LiveUserRtdb.fromMap(uid, data);
+        } catch (e) {
+          debugPrint('❌ RTDB parse failed for $uid: $e, data=$v');
           return;
         }
 
@@ -179,7 +191,7 @@ class GroupsLiveRepository {
       if (heading != null) 'heading': heading,
       if (speed != null) 'speed': speed,
       if (accuracyM != null) 'accuracy': accuracyM,
-      'updatedAt': ServerValue.timestamp,
+      'updatedAtMs': updatedAtMs,
     });
   }
 
