@@ -64,7 +64,7 @@ class _FabMini extends StatelessWidget {
       message: tooltip,
       waitDuration: const Duration(milliseconds: 300),
       child: Material(
-        color: filled ? textMainColor : surfaceColor,
+        color: filled ? buttonBackgroundColor : surfaceColor,
         shape: const CircleBorder(),
         elevation: 4,
         child: InkWell(

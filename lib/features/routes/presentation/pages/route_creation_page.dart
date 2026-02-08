@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:offroad_nav/features/routes/presentation/map/map_camera_actions.dart';
 import 'package:offroad_nav/features/routes/presentation/map/map_quick_controls.dart';
+import 'package:offroad_nav/features/routes/presentation/map/restricted_zones_loader.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../design/images.dart';
@@ -31,14 +32,22 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
   static const double _panelBottom = 45;
 
   BitmapDescriptor? _customMarkerIcon;
+
   GoogleMapController? _map;
+  Set<Polygon> _restrictedPolygons = {};
   bool _showRestricted = false;
+  bool _restrictedLoading =false;
+
+  LatLng? get _bestTarget {
+  return _ctrl.currentPos ?? (_ctrl.track.isNotEmpty ? _ctrl.track.last : null);
+}
 
   @override
   void initState() {
     super.initState();
     WakelockPlus.enable();
     _loadCustomMarker();
+    _loadRestricted();
     _ctrl.start();
   }
 
@@ -52,6 +61,24 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
     if (!mounted) return;
     setState(() => _customMarkerIcon = bitmap);
   }
+
+Future<void> _loadRestricted() async {
+  if (_restrictedLoading || _restrictedPolygons.isNotEmpty) return;
+  _restrictedLoading = true;
+
+  try {
+    final polys = await RestrictedZonesLoader.loadFromAsset(
+      'assets/geo/kr_kaitseala.geojson',
+      maxPolygons: 2000,
+    );
+    if (!mounted) return;
+    setState(() => _restrictedPolygons = polys);
+  } catch (e) {
+    debugPrint('Restricted zones load failed: $e');
+  } finally {
+    _restrictedLoading = false;
+  }
+}
 
   @override
   void dispose() {
@@ -138,6 +165,7 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
             arrowIcon: _customMarkerIcon,
             lookAheadMeters: 0,
             onMapCreated: (c) => _map = c,
+            polygons: _showRestricted ? _restrictedPolygons : const <Polygon>{},
           ),
 
             // // Re-center
@@ -165,14 +193,14 @@ class _RouteCreationPageState extends State<RouteCreationPage> {
               child: MapQuickControls(
                 onCenter: () => MapCameraActions.centerOn(
                   controller: _map,
-                  target: _ctrl.track.isNotEmpty ? _ctrl.track.first : null,
+                  target: _bestTarget,
                   zoom: 17,
                   tilt: 60,
                   bearing: 0,
                 ),
                 onNorth: () => MapCameraActions.faceNorth(
                   controller: _map,
-                  keepTarget: _ctrl.track.isNotEmpty ? _ctrl.track.first : null,
+                  keepTarget: _bestTarget,
                   zoom: 17,
                   tilt: 60,
                 ),

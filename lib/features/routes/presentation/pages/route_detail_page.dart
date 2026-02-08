@@ -9,7 +9,6 @@ import 'package:offroad_nav/features/routes/presentation/map/map_quick_controls.
 
 import '../../../../design/colors.dart';
 import '../../../../design/widgets/app_bar.dart';
-import '../widgets/map_right_buttons.dart';
 import '../widgets/navigation_bottom_panel.dart';
 import 'route_tracking_page.dart';
 
@@ -107,37 +106,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       southwest: LatLng(x0, y0),
     );
   }
-
-  // // кнопка "центрировать" — центр на старте маршрута
-  // void _centerCamera() {
-  // if (_mapController == null) return;
-
-  // _mapController!.animateCamera(
-  //   CameraUpdate.newCameraPosition(
-  //     CameraPosition(
-  //       target: _routePoints.first,
-  //       zoom: 17,
-  //       tilt: 60,      // если нужен наклон
-  //       bearing: 0, // если есть расчёт курса
-  //     ),
-  //   ),
-  // );
-  // }
-
-
-  // // кнопка "на север"
-  // void _faceNorth() {
-  //   if (_mapController == null || _routePoints.isEmpty) return;
-  //   _mapController!.animateCamera(
-  //     CameraUpdate.newCameraPosition(
-  //       CameraPosition(
-  //         target: _routePoints.first,
-  //         zoom: 17,
-  //         bearing: 0, // поворот на север
-  //       ),
-  //     ),
-  //   );
-  // }
 
   @override
   Widget build(BuildContext context) {

@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'package:flutter/services.dart' show rootBundle, Color;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:offroad_nav/design/colors.dart';
 
 class RestrictedZonesLoader {
   /// Загружает GeoJSON из assets и конвертит в polygons для GoogleMap
@@ -61,8 +62,8 @@ class RestrictedZonesLoader {
         holes: holes,
         strokeWidth: 2,
         // можно потом привести к твоим цветам
-        strokeColor: const Color(0xFFB00020),
-        fillColor: const Color(0x33B00020), // 20% alpha
+        strokeColor: errorColor,
+        fillColor: chipBgColor.withOpacity(0.35), // 20% alpha
         consumeTapEvents: false,
       ),
     );

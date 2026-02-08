@@ -8,6 +8,9 @@ import 'package:offroad_nav/design/images.dart';
 
 import 'package:offroad_nav/design/widgets/app_bar.dart';
 import 'package:offroad_nav/design/colors.dart';
+import 'package:offroad_nav/features/routes/presentation/map/map_camera_actions.dart';
+import 'package:offroad_nav/features/routes/presentation/map/map_quick_controls.dart';
+import 'package:offroad_nav/features/routes/presentation/map/restricted_zones_loader.dart';
 import 'package:offroad_nav/features/routes/presentation/widgets/route_action_bar.dart';
 import 'package:offroad_nav/features/routes/presentation/utils/marker_dot.dart';
 
@@ -164,10 +167,16 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
   // Иконка точек
   BitmapDescriptor? _dotIcon;
 
+  bool _showRestricted = false;
+  Set<Polygon> _restrictedPolygons = {};
+  bool _restrictedLoading = false;
+  LatLng _cameraTarget = const LatLng(59.0, 26.0);
+
   @override
   void initState() {
     super.initState();
     _initDot();
+    _loadRestricted();
     // _centerToMyLocation();
   }
 
@@ -176,21 +185,38 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _centerToMyLocation() async {
-    try {
-      bool s = await _loc.serviceEnabled();
-      if (!s) s = await _loc.requestService();
-      var p = await _loc.hasPermission();
-      if (p == PermissionStatus.denied) p = await _loc.requestPermission();
-      if (p != PermissionStatus.granted) return;
+    Future<void> _centerToMyLocation() async {
+      try {
+        bool s = await _loc.serviceEnabled();
+        if (!s) s = await _loc.requestService();
+        var p = await _loc.hasPermission();
+        if (p == PermissionStatus.denied) p = await _loc.requestPermission();
+        if (p != PermissionStatus.granted) return;
 
-      final l = await _loc.getLocation();
-      if (l.latitude == null || l.longitude == null) return;
+        final l = await _loc.getLocation();
+        if (l.latitude == null || l.longitude == null) return;
 
-      setState(() => _camera = LatLng(l.latitude!, l.longitude!));
-      _map?.animateCamera(CameraUpdate.newLatLngZoom(_camera, 15));
-    } catch (_) {}
+        setState(() => _camera = LatLng(l.latitude!, l.longitude!));
+        _map?.animateCamera(CameraUpdate.newLatLngZoom(_camera, 15));
+      } catch (_) {}
+    }
+
+Future<void> _loadRestricted() async {
+  if (_restrictedLoading || _restrictedPolygons.isNotEmpty) return;
+  _restrictedLoading = true;
+
+  try {
+    final polys = await RestrictedZonesLoader.loadFromAsset(
+      'assets/geo/kr_kaitseala.geojson',
+    );
+    if (!mounted) return;
+    setState(() => _restrictedPolygons = polys);
+  } catch (e) {
+    debugPrint('Restricted zones load failed: $e');
+  } finally {
+    _restrictedLoading = false;
   }
+}
 
   // Подогнать камеру под все точки
   void _fitBounds() {
@@ -342,13 +368,34 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
             initialCameraPosition: CameraPosition(target: _camera, zoom: 12),
             onMapCreated: (c) {
               _map = c;
-              _centerToMyLocation();  // вызываем ТУТ, когда карта уже есть
+              //_centerToMyLocation();  // вызываем ТУТ, когда карта уже есть
             },
             markers: markers,
             polylines: polylines,
             onLongPress: _onAddPoint,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
+            polygons: _showRestricted ? _restrictedPolygons : const <Polygon>{},
+            onCameraMove: (pos) => _cameraTarget = pos.target,
+          ),
+
+          Positioned(
+            right: 16,
+            bottom: 200,
+            child: SafeArea(
+              bottom: false,
+              child: MapQuickControls(
+                onCenter: _centerToMyLocation,
+                onNorth: () => MapCameraActions.faceNorth(
+                  controller: _map,
+                  keepTarget: _cameraTarget,
+                  zoom: 17,
+                  tilt: 60,
+                ),
+                onToggleRestricted: () => setState(() => _showRestricted = !_showRestricted),
+                restrictedEnabled: _showRestricted,
+              ),
+            ),
           ),
 
           // счётчик точек + длина
@@ -370,20 +417,6 @@ class _RoutePlannerPageState extends State<RoutePlannerPage> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-            ),
-          ),
-
-          // кнопка "центрировать на мне"
-          Positioned(
-            right: 16,
-            top: 12,
-            child: SafeArea(
-              bottom: false,
-              child: FloatingActionButton.small(
-                backgroundColor: Colors.black87,
-                onPressed: _centerToMyLocation,
-                child: const Icon(Icons.my_location, color: surfaceColor),
               ),
             ),
           ),

@@ -13,6 +13,7 @@ class TrackerMap extends StatefulWidget {
     this.bottomPadding = 0,
     this.lookAheadMeters = 140, 
     this.onMapCreated, 
+    this.polygons = const <Polygon>{}, 
 
   });
 
@@ -21,6 +22,7 @@ class TrackerMap extends StatefulWidget {
   final double bottomPadding;
   final double lookAheadMeters;
   final void Function(GoogleMapController controller)? onMapCreated;
+  final Set<Polygon> polygons;
 
   @override
   State<TrackerMap> createState() => _TrackerMapState();
@@ -133,6 +135,7 @@ class _TrackerMapState extends State<TrackerMap> {
       zoomControlsEnabled: false,   // ✅ уберёт +/-
       compassEnabled: false,        // по желанию
       myLocationButtonEnabled: false, 
+      polygons: widget.polygons,
       initialCameraPosition: CameraPosition(
         target: pos ?? const LatLng(59.0, 26.0),
         zoom: 15,

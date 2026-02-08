@@ -481,7 +481,6 @@ Future<void> _loadRestrictedZones() async {
       },
       loading: () => <Marker>{},
       error: (e, st) {
-        // debugPrint('❌ liveUsersWithProfilesProvider error: $e');
         debugPrintStack(stackTrace: st);
         return <Marker>{};
       },
@@ -614,37 +613,7 @@ Future<void> _loadRestrictedZones() async {
                   ),
                 ),
               ),
-//               Positioned(
-//   right: padding16,
-//   bottom: 200, // подстрой под твои кнопки
-//   child: GestureDetector(
-//     onTap: () async {
-//       if (_restrictedPolygons.isEmpty) {
-//         await _loadRestrictedZones();
-//       }
-//       if (!mounted) return;
-//       setState(() => _showRestricted = !_showRestricted);
-//     },
-//     child: Container(
-//       width: 48,
-//       height: 48,
-//       decoration: BoxDecoration(
-//         color: _showRestricted ? buttonBackgroundColor : Colors.black.withOpacity(0.6),
-//         borderRadius: BorderRadius.circular(12),
-//         boxShadow: const [
-//           BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3)),
-//         ],
-//       ),
-//       child: Icon(
-//         Icons.warning_amber_rounded,
-//         color: Colors.white,
-//         size: 24,
-//       ),
-//     ),
-//   ),
-// ),
-            // start gate hint
-            // if (showGateBanner)
+
             Positioned(
               left: padding16,
               right: padding16,
@@ -745,6 +714,7 @@ Future<void> _loadRestrictedZones() async {
     }
   }
 
+//TODO Доделать паузу!!!
   void _togglePause() {
     ScaffoldMessenger.of(
       context,

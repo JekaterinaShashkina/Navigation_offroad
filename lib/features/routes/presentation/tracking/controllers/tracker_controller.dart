@@ -149,7 +149,6 @@ Future<void> clearTrack() async {
   // ----- обработка локации -----
 
   void _onLocation(LocationData l) {
-    debugPrint('OFFROAD 🟢🟢🟢 onLocation tick lat=${l.latitude} lng=${l.longitude} acc=${l.accuracy}');
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastUpdateMs < _MIN_UPDATE_MS) return;
     _lastUpdateMs = now;
@@ -212,7 +211,6 @@ Future<void> clearTrack() async {
     // запись трека — не чаще, чем каждые ~3м
     if (_isRecording) {
       final shouldAdd = track.isEmpty || distanceM(track.last, filteredPos) > 3;
-      debugPrint('OFFROAD 🔥REC isRecording=$_isRecording trackLen=${track.length} shouldAdd=$shouldAdd');
       if (shouldAdd) track.add(filteredPos);
     }
 
