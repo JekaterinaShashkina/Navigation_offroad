@@ -146,8 +146,8 @@ flowchart LR
 ```mermaid
 flowchart TB
   subgraph Clients
-    Flutter[Flutter mobiilirakendus]
-    Web[Veebirakendus (React/Vite)]
+    Flutter["Flutter mobiilirakendus"]
+    Web["Veebirakendus (React/Vite)"]
   end
 
   subgraph Firebase
