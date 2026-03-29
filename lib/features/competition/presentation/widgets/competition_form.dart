@@ -7,7 +7,8 @@ import 'package:offroad_nav/design/widgets/pill_picker.dart';
 
 import 'package:offroad_nav/features/competition/data/repositories/competitions_repository.dart';
 import 'package:offroad_nav/features/competition/domain/config/competition_rules.dart';
-import 'package:offroad_nav/features/competition/domain/config/competition_rules.dart' show CompetitionRule;
+import 'package:offroad_nav/features/competition/domain/config/competition_rules.dart'
+    show CompetitionRule;
 import 'package:offroad_nav/features/competition/domain/entities/competition.dart';
 import 'package:offroad_nav/features/competition/presentation/pages/competition_rules_page.dart';
 import 'package:offroad_nav/features/competition/presentation/widgets/vehicle_selector.dart';
@@ -21,7 +22,7 @@ import 'package:offroad_nav/design/widgets/form_fields_label.dart';
 import 'package:offroad_nav/features/competition/presentation/widgets/time_limit_picker.dart';
 
 class CompetitionForm extends ConsumerStatefulWidget {
-    final String submitLabel;
+  final String submitLabel;
   final Future<void> Function(CompetitionInput input) onSubmit;
 
   /// Если не null — это редактирование (prefill полей)
@@ -55,42 +56,26 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
   String _vehicleTypeUi = 'ATV';
 
   @override
-    void initState() {
-      super.initState();
+  void initState() {
+    super.initState();
 
-      final c = widget.initial;
-      if (c == null) return;
+    final c = widget.initial;
+    if (c == null) return;
 
-      _nameCtrl.text = c.name;
-      _descriptionCtrl.text = c.description;
+    _nameCtrl.text = c.name;
+    _descriptionCtrl.text = c.description;
 
-      _startAt = c.startAt;
-      _endAt = c.endAt;
+    _startAt = c.startAt;
+    _endAt = c.endAt;
 
-      _vehicleTypeUi = (c.vehicleType ?? 'atv').toUpperCase();
+    _vehicleTypeUi = (c.vehicleType ?? 'atv').toUpperCase();
 
-      // rule: ищем по title (потому что rulesText ты сохраняла как title)
-      _rule = competitionRules.firstWhere(
-        (r) => r.title == c.rulesText,
-        orElse: () => competitionRules.first,
-      );
-
-      // route: просто показываем как selected в picker (если RouteEntity позволяет)
-      // Если твой RouteEntity требует больше полей — тогда этот блок можно убрать,
-      // а маршрут пользователь выберет через Browse routes.
-    //   try {
-    //   _route = RouteEntity(
-    //     id: c.routeId,
-    //     name: (c.routeName ?? c.routeId),
-    //     ownerId: '',
-    //     points: [],
-    //     isPublic: null,
-    //     createdAt: null,
-    //   );
-    // } catch (_) {
-    //   _route = null;
-    // }
-    }
+    // rule: ищем по title (потому что rulesText ты сохраняла как title)
+    _rule = competitionRules.firstWhere(
+      (r) => r.title == c.rulesText,
+      orElse: () => competitionRules.first,
+    );
+  }
 
   @override
   void dispose() {
@@ -106,7 +91,9 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
     // --- EDIT PREFILL: подставляем выбранный RouteEntity по routeId ---
     // Чтобы PillPicker показал текущий маршрут в edit режиме.
     final initRouteId = widget.initial?.routeId;
-    if (_route == null && initRouteId != null && routesState.routes.isNotEmpty) {
+    if (_route == null &&
+        initRouteId != null &&
+        routesState.routes.isNotEmpty) {
       final match = routesState.routes.cast<RouteEntity?>().firstWhere(
         (r) => r?.id == initRouteId,
         orElse: () => null,
@@ -123,7 +110,12 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
 
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(padding16, padding12, padding16, padding24),
+        padding: const EdgeInsets.fromLTRB(
+          padding16,
+          padding12,
+          padding16,
+          padding24,
+        ),
         child: Form(
           key: _formKey,
           child: Column(
@@ -133,8 +125,9 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
               const SizedBox(height: 8),
               PillTextField(
                 controller: _nameCtrl,
-                hint: 'Lorem ipsum',
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter name' : null,
+                hint: 'Enter competition name',
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Enter name' : null,
               ),
               const SizedBox(height: height16),
 
@@ -143,7 +136,7 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
               TextFormField(
                 controller: _descriptionCtrl,
                 maxLines: 3,
-                decoration: pillInputDecoration('Lorem ipsum'),
+                decoration: pillInputDecoration('Enter description'),
               ),
               const SizedBox(height: height16),
 
@@ -155,7 +148,9 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const CompetitionRulesPage()),
+                        MaterialPageRoute(
+                          builder: (_) => const CompetitionRulesPage(),
+                        ),
                       );
                     },
                     child: const Text('Rules'),
@@ -170,7 +165,15 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
                 idOf: (r) => r.id,
                 titleOf: (r) => r.title,
                 subtitleOf: (r) => r.description,
-                onSelect: (r) => setState(() => _rule = r),
+                onSelect: (r) {
+                  if (!r.enabled) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('This rule is coming soon')),
+                    );
+                    return;
+                  }
+                  setState(() => _rule = r);
+                },
               ),
               const SizedBox(height: height16),
 
@@ -203,8 +206,13 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
               const SizedBox(height: 8),
 
               PillNavRow(
-                title: _startAt == null ? 'Start time' : 'Start: ${_formatDt(_startAt!)}',
-                trailing: const Icon(Icons.calendar_month_rounded, color: textHintColor),
+                title: _startAt == null
+                    ? 'Start time'
+                    : 'Start: ${_formatDt(_startAt!)}',
+                trailing: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: textHintColor,
+                ),
                 onTap: () async {
                   final dt = await _pickDateTime(context, initial: _startAt);
                   if (dt != null) setState(() => _startAt = dt);
@@ -213,8 +221,13 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
               const SizedBox(height: 10),
 
               PillNavRow(
-                title: _endAt == null ? 'End time' : 'End: ${_formatDt(_endAt!)}',
-                trailing: const Icon(Icons.calendar_month_rounded, color: textHintColor),
+                title: _endAt == null
+                    ? 'End time'
+                    : 'End: ${_formatDt(_endAt!)}',
+                trailing: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: textHintColor,
+                ),
                 onTap: () async {
                   final dt = await _pickDateTime(context, initial: _endAt);
                   if (dt != null) setState(() => _endAt = dt);
@@ -245,7 +258,9 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: buttonBackgroundColor,
                     foregroundColor: textMainColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
                     elevation: 0,
                   ),
                   child: _saving
@@ -254,7 +269,10 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
                           width: 22,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(widget.submitLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      : Text(
+                          widget.submitLabel,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                 ),
               ),
             ],
@@ -276,7 +294,10 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
     }
   }
 
-  Future<DateTime?> _pickDateTime(BuildContext context, {DateTime? initial}) async {
+  Future<DateTime?> _pickDateTime(
+    BuildContext context, {
+    DateTime? initial,
+  }) async {
     final now = DateTime.now();
     final init = initial ?? now;
 
@@ -310,16 +331,16 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_rule == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a rule')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Select a rule')));
       return;
     }
 
     if (_route == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a route')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Select a route')));
       return;
     }
 
@@ -351,11 +372,11 @@ class _CompetitionFormState extends ConsumerState<CompetitionForm> {
         endAt: _endAt!,
       );
 
-    await widget.onSubmit(input);
+      await widget.onSubmit(input);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

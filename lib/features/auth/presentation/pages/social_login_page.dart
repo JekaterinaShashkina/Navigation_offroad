@@ -69,13 +69,13 @@ class SocialLoginPage extends ConsumerWidget {
                     const SizedBox(height: height24),
 
                     // Facebook — пока заглушка
-                    AppButton(
-                      icon: fbImage,
-                      width: width335,
-                      text: "Facebook ",
-                      onPressed: authState.loading ? null : () {},
-                    ),
-                    const SizedBox(height: height24),
+                    // AppButton(
+                    //   icon: fbImage,
+                    //   width: width335,
+                    //   text: "Facebook ",
+                    //   onPressed: authState.loading ? null : () {},
+                    // ),
+                    // const SizedBox(height: height24),
 
                     // 🟦 Google — теперь через AuthController
                     AppButton(
@@ -94,13 +94,13 @@ class SocialLoginPage extends ConsumerWidget {
                     const SizedBox(height: height24),
 
                     // Apple — пока заглушка
-                    AppButton(
-                      icon: appleImage,
-                      width: width335,
-                      text: "Apple ",
-                      onPressed: authState.loading ? null : () {},
-                    ),
-                    const SizedBox(height: height24),
+                    // AppButton(
+                    //   icon: appleImage,
+                    //   width: width335,
+                    //   text: "Apple ",
+                    //   onPressed: authState.loading ? null : () {},
+                    // ),
+                    // const SizedBox(height: height24),
 
                     // Email / password
                     AppButton(

@@ -78,6 +78,12 @@ class RouteTrackingController {
   RouteProgressState _state = RouteProgressState.empty;
   RouteProgressState get state => _state;
 
+  void shiftStartTime(Duration delta) {
+    final startTime = _state.startTime;
+    if (startTime == null || delta == Duration.zero) return;
+    _state = _state.copyWith(startTime: startTime.add(delta));
+  }
+
   // Если GPS шумит, 20м может быть мало. Можешь поднять до 30-40.
   static const double startRadiusM = 20;
 
@@ -103,36 +109,32 @@ class RouteTrackingController {
     return index;
   }
 
-  int closestPointIndexWindow(
-  List<LatLng> route,
-  LatLng pos,
-  int centerIdx,
-) {
-  const int window = 40; // 20–60 ок
-  final int start = (centerIdx - window).clamp(0, route.length - 1).toInt();
-  final int end   = (centerIdx + window).clamp(0, route.length - 1).toInt();
+  int closestPointIndexWindow(List<LatLng> route, LatLng pos, int centerIdx) {
+    const int window = 40; // 20–60 ок
+    final int start = (centerIdx - window).clamp(0, route.length - 1).toInt();
+    final int end = (centerIdx + window).clamp(0, route.length - 1).toInt();
 
-  double minDist = double.infinity;
-  int best = centerIdx.clamp(0, route.length - 1);
+    double minDist = double.infinity;
+    int best = centerIdx.clamp(0, route.length - 1);
 
-  for (int i = start; i <= end; i++) {
-    final d = distanceM(pos, route[i]);
-    if (d < minDist) {
-      minDist = d;
-      best = i;
+    for (int i = start; i <= end; i++) {
+      final d = distanceM(pos, route[i]);
+      if (d < minDist) {
+        minDist = d;
+        best = i;
+      }
     }
+    return best;
   }
-  return best;
-}
 
-SegmentSnap closestSegmentWindow(
+  SegmentSnap closestSegmentWindow(
     List<LatLng> route,
     LatLng pos,
     int centerIdx,
   ) {
     const int window = 40; // можно 40-80 для авто
     final int start = (centerIdx - window).clamp(0, route.length - 2).toInt();
-    final int end   = (centerIdx + window).clamp(0, route.length - 2).toInt();
+    final int end = (centerIdx + window).clamp(0, route.length - 2).toInt();
 
     SegmentSnap? best;
     for (int i = start; i <= end; i++) {
@@ -162,18 +164,17 @@ SegmentSnap closestSegmentWindow(
     DateTime? startTime = _state.startTime;
 
     final int maxPts = switch (profile) {
-    TrackingProfile.walk => 5,
-    TrackingProfile.moto => 10,
-    TrackingProfile.auto => 12,
-    _ => 6,
-  };     // 12*10м = 120м за тик
+      TrackingProfile.walk => 5,
+      TrackingProfile.moto => 10,
+      TrackingProfile.auto => 12,
+      _ => 6,
+    }; // 12*10м = 120м за тик
     final double maxM = switch (profile) {
-    TrackingProfile.walk => 300.0,
-    TrackingProfile.moto => 500.0,
-    TrackingProfile.auto => 700.0,
-    _ => 350.0,
-  }; // на авто бывает “рывок” GPS
-
+      TrackingProfile.walk => 300.0,
+      TrackingProfile.moto => 500.0,
+      TrackingProfile.auto => 700.0,
+      _ => 350.0,
+    }; // на авто бывает “рывок” GPS
 
     // 1) До старта — считаем расстояние до start point
     double? distToStartM = started ? null : distanceM(pos, route.first);
@@ -218,34 +219,36 @@ SegmentSnap closestSegmentWindow(
     final prev = _state.maxIndexReached;
     final safePrev = prev.clamp(0, route.length - 1);
 
-final center = safePrev > 0
-    ? safePrev
-    : _state.startIndex.clamp(0, route.length - 2);
+    final center = safePrev > 0
+        ? safePrev
+        : _state.startIndex.clamp(0, route.length - 2);
 
-// ✅ ищем ближайший сегмент и проекцию на него
-final snap = closestSegmentWindow(route, pos, center);
+    // ✅ ищем ближайший сегмент и проекцию на него
+    final snap = closestSegmentWindow(route, pos, center);
 
-// превращаем сегмент+т в “индекс прогресса”
-final rawIdx = (snap.segIndex + (snap.t >= 0.5 ? 1 : 0))
-    .clamp(0, route.length - 1);
+    // превращаем сегмент+т в “индекс прогресса”
+    final rawIdx = (snap.segIndex + (snap.t >= 0.5 ? 1 : 0)).clamp(
+      0,
+      route.length - 1,
+    );
 
-final distToRoute = snap.distToRouteM;
+    final distToRoute = snap.distToRouteM;
 
-int idx = safePrev;
+    int idx = safePrev;
 
-if (distToRoute <= onRouteThresholdM) {
-  // монотонно (не назад)
-  idx = rawIdx < safePrev ? safePrev : rawIdx;
+    if (distToRoute <= onRouteThresholdM) {
+      // монотонно (не назад)
+      idx = rawIdx < safePrev ? safePrev : rawIdx;
 
-  // ограничение скачка по точкам
-  if (idx - safePrev > maxPts) idx = safePrev + maxPts;
+      // ограничение скачка по точкам
+      if (idx - safePrev > maxPts) idx = safePrev + maxPts;
 
-  // ограничение скачка по метрам
-  final jumpM = distanceM(route[safePrev], route[idx]);
-  if (jumpM > maxM) {
-    idx = safePrev;
-  }
-}
+      // ограничение скачка по метрам
+      final jumpM = distanceM(route[safePrev], route[idx]);
+      if (jumpM > maxM) {
+        idx = safePrev;
+      }
+    }
 
     // 5) remaining по маршруту
     double remaining = 0;

@@ -16,7 +16,8 @@ class CompetitionRulesPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: backgroundMainColor,
       appBar: NewAppBar(
-        title: 'Rules', onPressed: () => Navigator.pop(context),
+        title: 'Rules',
+        onPressed: () => Navigator.pop(context),
       ),
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -25,38 +26,63 @@ class CompetitionRulesPage extends StatelessWidget {
         itemBuilder: (_, i) {
           final rule = rules[i];
           final selected = current == rule.title;
+          final enabled = rule.enabled;
 
-          return Material(
-            color: surfaceColor,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
+          return Opacity(
+            opacity: enabled ? 1.0 : 0.4,
+            child: Material(
+              color: surfaceColor,
               borderRadius: BorderRadius.circular(16),
-              onTap: () => Navigator.pop(context, rule.title),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x141A1A1A), blurRadius: 16, offset: Offset(0, 8)),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(rule.title,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.pop(context, rule.title),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x141A1A1A),
+                        blurRadius: 16,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              rule.title,
                               style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w700, color: textMainColor)),
-                        ),
-                        if (selected)
-                          const Icon(Icons.check_circle, color: Colors.black, size: 20),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(rule.description, style: hintTextStyle),
-                  ],
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: textMainColor,
+                              ),
+                            ),
+                          ),
+                        if (!enabled)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: Text(
+                              'Coming soon',
+                              style: TextStyle(fontSize: 12, color: textHintColor),
+                            ),
+                          ),
+                          if (selected)
+                            const Icon(
+                              Icons.check_circle,
+                              color: Colors.black,
+                              size: 20,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(rule.description, style: hintTextStyle),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -66,4 +92,3 @@ class CompetitionRulesPage extends StatelessWidget {
     );
   }
 }
-

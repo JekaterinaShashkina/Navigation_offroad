@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:offroad_nav/design/colors.dart';
-import 'package:offroad_nav/design/widgets/pill_nav_row.dart';
-import 'package:offroad_nav/design/widgets/smart_avatar.dart';
 import 'package:offroad_nav/features/competition/presentation/pages/competition_user_attempts_page.dart';
 import 'package:offroad_nav/features/competition/presentation/widgets/competition_participant_row.dart';
 

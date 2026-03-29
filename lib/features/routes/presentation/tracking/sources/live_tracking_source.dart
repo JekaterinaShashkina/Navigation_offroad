@@ -13,7 +13,7 @@ class LiveTrackingSource implements ITrackingSource {
     this.accMaxM = 35,
     this.maxJumpM = 40,
     this.startPoint,
-    this.requireStartWithinM = 20, // 10–20м обычно норм
+    this.requireStartWithinM = 20, // 10-20m usually works fine
   }) : _loc = location ?? Location();
 
   DateTime? _prevAt;
@@ -29,8 +29,7 @@ class LiveTrackingSource implements ITrackingSource {
   LatLng? _prev;
 
   double _bearingSmoothed = 0.0;
-
-  bool _startGatePassed = false;
+  bool _isPaused = false;
 
   @override
   Stream<TrackSample> watch() {
@@ -56,19 +55,18 @@ class LiveTrackingSource implements ITrackingSource {
     await applyProfile(_profile);
 
     _sub = _loc.onLocationChanged.listen((loc) {
+      if (_isPaused) return;
       if (loc.latitude == null || loc.longitude == null) return;
 
-      // На авто accuracy иногда 10-60м, 35 может быть жестко — можно поднять
       if (loc.accuracy != null && loc.accuracy! > 60) return;
 
       final cur = LatLng(loc.latitude!, loc.longitude!);
 
-      // jump filter (adaptive)
       final now = DateTime.now();
       if (_prev != null && _prevAt != null) {
         final dt = now.difference(_prevAt!).inMilliseconds / 1000.0;
         final jump = distanceM(_prev!, cur);
-        final allowed = (50.0 * dt) + 20.0; // 180 км/ч + запас
+        final allowed = (50.0 * dt) + 20.0;
         if (jump > allowed) return;
       }
 
@@ -90,39 +88,45 @@ class LiveTrackingSource implements ITrackingSource {
 
   TrackingProfile _profile = TrackingProfile.def;
 
-Future<void> applyProfile(TrackingProfile p) async {
-  _profile = p;
+  Future<void> applyProfile(TrackingProfile p) async {
+    _profile = p;
 
-  // Если Auto — стартуем как walk, а дальше можно (опционально) авто-переключать по speed.
-  if (p == TrackingProfile.walk) {
-    await _loc.changeSettings(
-      accuracy: LocationAccuracy.high,
-      interval: 1000,
-      distanceFilter: 3,
-    );
-    
-  } else if (p == TrackingProfile.moto) {
-    await _loc.changeSettings(
-      accuracy: LocationAccuracy.navigation,
-      interval: 650,
-      distanceFilter: 2,
-    );
-  } else if (p == TrackingProfile.auto) {
-    await _loc.changeSettings(
-      accuracy: LocationAccuracy.navigation,
-      interval: 500,
-      distanceFilter: 2,
-    );
-  } else {
-    // Auto — компромиссный базовый режим
-    await _loc.changeSettings(
-      accuracy: LocationAccuracy.high,
-      interval: 1000,
-      distanceFilter: 3,
-    );
+    if (p == TrackingProfile.walk) {
+      await _loc.changeSettings(
+        accuracy: LocationAccuracy.high,
+        interval: 1000,
+        distanceFilter: 3,
+      );
+    } else if (p == TrackingProfile.moto) {
+      await _loc.changeSettings(
+        accuracy: LocationAccuracy.navigation,
+        interval: 650,
+        distanceFilter: 2,
+      );
+    } else if (p == TrackingProfile.auto) {
+      await _loc.changeSettings(
+        accuracy: LocationAccuracy.navigation,
+        interval: 500,
+        distanceFilter: 2,
+      );
+    } else {
+      await _loc.changeSettings(
+        accuracy: LocationAccuracy.high,
+        interval: 1000,
+        distanceFilter: 3,
+      );
+    }
   }
-}
 
+  @override
+  Future<void> pause() async {
+    _isPaused = true;
+  }
+
+  @override
+  Future<void> resume() async {
+    _isPaused = false;
+  }
 
   @override
   Future<void> dispose() async {

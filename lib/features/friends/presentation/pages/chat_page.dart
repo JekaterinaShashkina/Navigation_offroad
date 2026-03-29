@@ -31,6 +31,7 @@ class _ChatPageState extends State<ChatPage> {
 
   late final String _myUid;
   late final String _chatId;
+  final bool _chatEnabled = false;
 
   @override
   void initState() {
@@ -62,26 +63,26 @@ class _ChatPageState extends State<ChatPage> {
 
     await FirebaseFirestore.instance.runTransaction((tx) async {
       tx.set(msgRef, {
-        'id'        : msgRef.id,
-        'chatId'    : _chatId,
-        'text'      : msg,
-        'from'      : _myUid,
-        'to'        : widget.peerUid,
-        'type'      : 'text',
+        'id': msgRef.id,
+        'chatId': _chatId,
+        'text': msg,
+        'from': _myUid,
+        'to': widget.peerUid,
+        'type': 'text',
         'created_at': now,
-        'read'      : false,
+        'read': false,
       });
 
       tx.set(chatRef, {
-        'chatId'      : _chatId,
+        'chatId': _chatId,
         'participants': [_myUid, widget.peerUid],
         'last_message': msg,
-        'updated_at'  : now,
+        'updated_at': now,
       }, SetOptions(merge: true));
     });
 
     _text.clear();
-    
+
     await Future.delayed(const Duration(milliseconds: 50));
     if (_scroll.hasClients) {
       _scroll.animateTo(
@@ -112,7 +113,10 @@ class _ChatPageState extends State<ChatPage> {
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: textMainColor),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: textMainColor,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(widget.peerName, style: head1TextStyle),
@@ -120,7 +124,9 @@ class _ChatPageState extends State<ChatPage> {
           // заглушки под звонок/видео — кнопки уже в дизайне
           _circleAction(const Icon(Icons.call_rounded, color: Colors.white)),
           const SizedBox(width: 8),
-          _circleAction(const Icon(Icons.videocam_rounded, color: Colors.white)),
+          _circleAction(
+            const Icon(Icons.videocam_rounded, color: Colors.white),
+          ),
           const SizedBox(width: 12),
         ],
       ),
@@ -144,7 +150,10 @@ class _ChatPageState extends State<ChatPage> {
                 return ListView.builder(
                   controller: _scroll,
                   reverse: true, // последние сообщения внизу
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   itemCount: docs.length,
                   itemBuilder: (_, i) {
                     final m = docs[i].data();
@@ -152,16 +161,23 @@ class _ChatPageState extends State<ChatPage> {
                     final text = (m['text'] ?? '').toString();
 
                     return Align(
-                      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: mine
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: MediaQuery.of(context).size.width * 0.7,
                         ),
                         child: Container(
                           margin: const EdgeInsets.symmetric(vertical: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: mine ? buttonSecondBackgroundColor : Colors.white,
+                            color: mine
+                                ? buttonSecondBackgroundColor
+                                : Colors.white,
                             borderRadius: BorderRadius.only(
                               topLeft: const Radius.circular(16),
                               topRight: const Radius.circular(16),
@@ -170,7 +186,13 @@ class _ChatPageState extends State<ChatPage> {
                             ),
                             boxShadow: mine
                                 ? null
-                                : const [BoxShadow(color: Color(0x141A1A1A), blurRadius: 12, offset: Offset(0, 6))],
+                                : const [
+                                    BoxShadow(
+                                      color: Color(0x141A1A1A),
+                                      blurRadius: 12,
+                                      offset: Offset(0, 6),
+                                    ),
+                                  ],
                           ),
                           child: Text(
                             text,
@@ -191,47 +213,68 @@ class _ChatPageState extends State<ChatPage> {
           // Поле ввода
           SafeArea(
             top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              color: backgroundMainColor,
-              child: Row(
-                children: [
-                  // иконка «прикрепить» — заглушка
-                  _circleAction(const Icon(Icons.add_rounded, color: Colors.white), size: 36),
-                  const SizedBox(width: 8),
-
-                  Expanded(
-                    child: TextField(
-                      controller: _text,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Type message…',
-                        hintStyle: hintTextStyle,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: const BorderSide(color: Color(0xFFE6E6EA)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: const BorderSide(color: Color(0xFFE6E6EA)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: const BorderSide(color: Color(0xFFD0D0D6)),
-                        ),
-                        filled: true,
-                        fillColor: surfaceColor,
+            child: Opacity(
+              opacity: _chatEnabled ? 1.0 : 0.4,
+              child: IgnorePointer(
+                ignoring: !_chatEnabled,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                  color: backgroundMainColor,
+                  child: Row(
+                    children: [
+                      // иконка «прикрепить» — заглушка
+                      _circleAction(
+                        const Icon(Icons.add_rounded, color: Colors.white),
+                        size: 36,
                       ),
-                      onSubmitted: (_) => _sendText(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                      const SizedBox(width: 8),
 
-                  // микрофон как во Figma — сейчас отправляет текст
-                  _circleAction(const Icon(Icons.mic_rounded, color: Colors.white), onTap: _sendText),
-                ],
+                      Expanded(
+                        child: TextField(
+                          controller: _text,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: InputDecoration(
+                            hintText: _chatEnabled ? 'Type message…' : 'Chat coming soon',
+                            hintStyle: hintTextStyle,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE6E6EA),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE6E6EA),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFD0D0D6),
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: surfaceColor,
+                          ),
+                          onSubmitted: (_) => _sendText(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // микрофон как во Figma — сейчас отправляет текст
+                      _circleAction(
+                        const Icon(Icons.mic_rounded, color: Colors.white),
+                        onTap: _sendText,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -247,7 +290,11 @@ class _ChatPageState extends State<ChatPage> {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: SizedBox(width: size, height: size, child: Center(child: icon)),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Center(child: icon),
+        ),
       ),
     );
   }

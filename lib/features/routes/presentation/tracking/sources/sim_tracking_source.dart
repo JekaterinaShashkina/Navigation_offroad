@@ -18,11 +18,12 @@ class SimTrackingSource implements ITrackingSource {
   Timer? _timer;
   int _i = 0;
   LatLng? _prev;
+  bool _isPaused = false;
 
   @override
   Stream<TrackSample> watch() {
     _timer ??= Timer.periodic(tick, (_) {
-      if (points.isEmpty) return;
+      if (_isPaused || points.isEmpty) return;
 
       if (_i >= points.length) {
         _timer?.cancel();
@@ -34,19 +35,28 @@ class SimTrackingSource implements ITrackingSource {
       LatLng? next = (_i < points.length) ? points[_i] : null;
 
       final bearing = (next != null)
-    ? bearingDeg(cur, next)      // <-- ВПЕРЁД
-    : (_prev == null ? 0.0 : bearingDeg(_prev!, cur));
+          ? bearingDeg(cur, next) // <-- ВПЕРЁД
+          : (_prev == null ? 0.0 : bearingDeg(_prev!, cur));
       _prev = cur;
 
-      _ctrl.add(
-        TrackSample(
-          pos: cur,
-          bearingDeg: bearing,
-        ),
-      );
+      _ctrl.add(TrackSample(pos: cur, bearingDeg: bearing));
     });
 
     return _ctrl.stream;
+  }
+
+  @override
+  Future<void> pause() async {
+    _isPaused = true;
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  @override
+  Future<void> resume() async {
+    if (!_isPaused) return;
+    _isPaused = false;
+    watch();
   }
 
   @override

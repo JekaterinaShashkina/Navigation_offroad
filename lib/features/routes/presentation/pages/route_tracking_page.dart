@@ -118,6 +118,8 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
   bool _showRestricted = false;
   Set<Polygon> _restrictedPolygons = {};
   bool _restrictedLoading = false;
+  bool _isPaused = false;
+  DateTime? _pausedAt;
 
   @override
   void initState() {
@@ -241,22 +243,22 @@ class _RouteTrackingPageState extends ConsumerState<RouteTrackingPage> {
     });
   }
 
-Future<void> _loadRestrictedZones() async {
-  if (_restrictedLoading || _restrictedPolygons.isNotEmpty) return;
-  _restrictedLoading = true;
+  Future<void> _loadRestrictedZones() async {
+    if (_restrictedLoading || _restrictedPolygons.isNotEmpty) return;
+    _restrictedLoading = true;
 
-  try {
-    final polys = await RestrictedZonesLoader.loadFromAsset(
-      'assets/geo/kr_kaitseala.geojson',
-    );
-    if (!mounted) return;
-    setState(() => _restrictedPolygons = polys);
-  } catch (e) {
-    debugPrint('Restricted zones load failed: $e');
-  } finally {
-    _restrictedLoading = false;
+    try {
+      final polys = await RestrictedZonesLoader.loadFromAsset(
+        'assets/geo/kr_kaitseala.geojson',
+      );
+      if (!mounted) return;
+      setState(() => _restrictedPolygons = polys);
+    } catch (e) {
+      debugPrint('Restricted zones load failed: $e');
+    } finally {
+      _restrictedLoading = false;
+    }
   }
-}
 
   @override
   void dispose() {
@@ -387,7 +389,8 @@ Future<void> _loadRestrictedZones() async {
 
     final elapsed = (!started || st.startTime == null)
         ? Duration.zero
-        : DateTime.now().difference(st.startTime!);
+        : (_isPaused && _pausedAt != null ? _pausedAt! : DateTime.now())
+              .difference(st.startTime!);
 
     // traversed polyline (зелёный)
     final traversedPoints = <LatLng>[];
@@ -403,7 +406,7 @@ Future<void> _loadRestrictedZones() async {
       }
     }
 
-    final isPaused = false; // пока заглушка, потом подключим
+    final isPaused = _isPaused;
     final isCompetition = widget.mode == TrackingMode.competition;
 
     final actions = <ActionButtonConfig>[
@@ -540,40 +543,46 @@ Future<void> _loadRestrictedZones() async {
               polygons: _showRestricted ? _restrictedPolygons : <Polygon>{},
             ),
             Positioned(
-  right: padding16,
-  bottom: 200, // чтобы не пересекалось с action bar
-  child: MapQuickControls(
-    onCenter: () {
-      final target = _leader.state.followLeader
-          ? _leader.state.leaderPos
-          : _progress.state.currentPos;
+              right: padding16,
+              bottom: 200, // чтобы не пересекалось с action bar
+              child: MapQuickControls(
+                onCenter: () {
+                  final target = _leader.state.followLeader
+                      ? _leader.state.leaderPos
+                      : _progress.state.currentPos;
 
-      MapCameraActions.centerOn(
-        controller: _controller,
-        target: target ?? (widget.points.isNotEmpty ? widget.points.first : null),
-        zoom: 18,
-        tilt: 60,
-        bearing: _leader.state.followLeader
-            ? (_leader.state.leaderHeading ?? _progress.state.bearingDeg)
-            : _progress.state.bearingDeg,
-      );
-    },
-    onNorth: () {
-      final target = _leader.state.followLeader
-          ? _leader.state.leaderPos
-          : _progress.state.currentPos;
+                  MapCameraActions.centerOn(
+                    controller: _controller,
+                    target:
+                        target ??
+                        (widget.points.isNotEmpty ? widget.points.first : null),
+                    zoom: 18,
+                    tilt: 60,
+                    bearing: _leader.state.followLeader
+                        ? (_leader.state.leaderHeading ??
+                              _progress.state.bearingDeg)
+                        : _progress.state.bearingDeg,
+                  );
+                },
+                onNorth: () {
+                  final target = _leader.state.followLeader
+                      ? _leader.state.leaderPos
+                      : _progress.state.currentPos;
 
-      MapCameraActions.faceNorth(
-        controller: _controller,
-        keepTarget: target ?? (widget.points.isNotEmpty ? widget.points.first : null),
-        zoom: 18,
-        tilt: 60,
-      );
-    },
-      onToggleRestricted: () => setState(() => _showRestricted = !_showRestricted),
-  restrictedEnabled: _showRestricted,
-  ),
-),
+                  MapCameraActions.faceNorth(
+                    controller: _controller,
+                    keepTarget:
+                        target ??
+                        (widget.points.isNotEmpty ? widget.points.first : null),
+                    zoom: 18,
+                    tilt: 60,
+                  );
+                },
+                onToggleRestricted: () =>
+                    setState(() => _showRestricted = !_showRestricted),
+                restrictedEnabled: _showRestricted,
+              ),
+            ),
 
             // follow leader button (только если мы в группе)
             if (gid != null && widget.mode == TrackingMode.live)
@@ -649,7 +658,9 @@ Future<void> _loadRestrictedZones() async {
       return;
     }
 
-    final finishedAt = DateTime.now();
+    final finishedAt = _isPaused && _pausedAt != null
+        ? _pausedAt!
+        : DateTime.now();
     final startedAt = st.startTime!;
 
     final profile = ref.read(trackingProfileProvider);
@@ -714,11 +725,36 @@ Future<void> _loadRestrictedZones() async {
     }
   }
 
-//TODO Доделать паузу!!!
-  void _togglePause() {
+  Future<void> _togglePause() async {
+    final st = _progress.state;
+    if (!st.started) return;
+
+    if (_isPaused) {
+      final pausedFor = _pausedAt == null
+          ? Duration.zero
+          : DateTime.now().difference(_pausedAt!);
+      await _source.resume();
+      _progress.shiftStartTime(pausedFor);
+      if (!mounted) return;
+      setState(() {
+        _isPaused = false;
+        _pausedAt = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Tracking resumed')));
+      return;
+    }
+
+    await _source.pause();
+    if (!mounted) return;
+    setState(() {
+      _isPaused = true;
+      _pausedAt = DateTime.now();
+    });
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Pause/Resume pressed')));
+    ).showSnackBar(const SnackBar(content: Text('Tracking paused')));
   }
 
   void _openTrackingSettings() {
