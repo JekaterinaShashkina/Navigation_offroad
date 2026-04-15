@@ -26,6 +26,7 @@ Offroad Nav on maastikusõidu navigeerimis- ja võistlussüsteem. Projekt võima
 5. **Marsruutide loendi vaatamine** ja haldamine (Public/Private, kustutamine).
 6. **Kasutajaprofiili haldamine** ja asukohanähtavuse seadistamine.
 
+Märkus: veebiklient on projektis olemas, kuid seda ei uuendatud käesoleva arendusetapi jooksul.
 ---
 
 ## 2. Funktsionaalsed nõuded
@@ -304,7 +305,7 @@ Täielik loend on failis `pubspec.yaml`.
   
    ```GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here```
    
-Ilma `.env` failita Androidi rakenduse build ebaõnnestub, kuna API võti lisatakse build’i ajal.
+Ilma `.env` failita Androidi rakendust ei saa käivitada, kuna API võti lisatakse build’i ajal.
 7. Loo `web_app` jaoks `.env` ja lisa Firebase võtmed.
 
 ### 5.4 Projekti build (Dev + Prod)
@@ -397,10 +398,7 @@ Näidis Realtime Database’i reeglitest:
   	
     "groups_members": {
       "$groupId": {
-        // чтобы участники могли проверить членство (не обязательно, но удобно)
         ".read": "auth != null && data.child(auth.uid).val() === true",
-        // менять состав группы лучше делать с сервера/через Firestore,
-        // поэтому здесь по умолчанию закрываем
         ".write": false
       }
     },  
