@@ -25,8 +25,8 @@ Offroad Nav on maastikusõidu navigeerimis- ja võistlussüsteem. Projekt võima
 4. **Võistlusel osalemine** (režiimi valik, start, tulemuste fikseerimine).
 5. **Marsruutide loendi vaatamine** ja haldamine (Public/Private, kustutamine).
 6. **Kasutajaprofiili haldamine** ja asukohanähtavuse seadistamine.
-
-Märkus: veebiklient on projektis olemas, kuid seda ei uuendatud käesoleva arendusetapi jooksul.
+  
+   Märkus: veebiklient on projektis olemas, kuid seda ei uuendatud käesoleva arendusetapi jooksul.
 ---
 
 ## 2. Funktsionaalsed nõuded
