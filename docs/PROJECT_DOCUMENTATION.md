@@ -300,9 +300,12 @@ Täielik loend on failis `pubspec.yaml`.
 1. Paigalda Flutter SDK.
 2. Paigalda Node.js ja npm (`web_app` jaoks).
 3. Google Maps API võti ei ole salvestatud koodi sees. Võti tuleb lisada `.env` faili projekti juurkaustas ning see süstitakse Androidi build’i käigus automaatselt.
-4. Loo projekti juurkausta `.env` fail ja lisa sinna vajalikud API võtmed, näiteks:```GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here```
+4. Loo projekti juurkausta `.env` fail ja lisa sinna vajalikud API võtmed, näiteks:
+  
+   ```GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here```
+   
 Ilma `.env` failita Androidi rakenduse build ebaõnnestub, kuna API võti lisatakse build’i ajal.
-5. Loo `web_app` jaoks `.env` ja lisa Firebase võtmed.
+7. Loo `web_app` jaoks `.env` ja lisa Firebase võtmed.
 
 ### 5.4 Projekti build (Dev + Prod)
 **Dev (Flutter):**
