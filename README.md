@@ -1,25 +1,40 @@
 # Offroad Nav
 
-Offroad Nav on maastikusõidu navigeerimis- ja võistlussüsteem, millel on Flutteril põhinev mobiiliklient ja React/Vite veebiklient. Projekt kasutab Firebase’i (Auth, Firestore, Realtime Database), et tagada ühtne autentimine, marsruutide salvestamine ja live-jälgimine.
+Offroad Nav is an off-road navigation and competition system that includes a Flutter-based mobile application and a React/Vite web client.
+
+The application uses Firebase (Authentication, Firestore, Realtime Database) to provide user authentication, route management, group functionality, and real-time tracking.
 
 
-## Kiire algus (Flutter)
+## Quick start (Flutter)
 
 ```bash
 flutter pub get
 flutter run
 ```
 
-## Kiire algus (Web)
+## Environment setup
+
+Before running the mobile application, create a .env file in the project root:
+
+```GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here```
+
+Without this file, the Android build will fail because the API key is injected during build time.
+
+
+## Quick start (Web)
 ```bash
 cd web_app
 npm install
 
 npm run dev
 ```
-## Dokumentatsioon
-Täielik projektidokumentatsioon asub failis `docs/PROJECT_DOCUMENTATION.md` ning sisaldab:
-* süsteemi ülevaadet, funktsionaalseid nõudeid ja äriprotsesse;
-* arhitektuuridiagramme, ER-skeemi ja projekti struktuuri;
-* tehnilist dokumentatsiooni, CI/CD soovitusi ja turbereegleid.
+## Dokumentation
+Full project documentation is available in: 
+
+`docs/PROJECT_DOCUMENTATION.md` 
+
+It includes:
+* system overview, functional requirements, and business logic;
+* architecture diagrams, ER schema, and project structure;
+* technical documentation, CI/CD recommendations, and security considerations.
 
