@@ -3,7 +3,7 @@
 ## 1. Süsteemi üldkirjeldus
 
 ### 1.1 Projekti eesmärk
-Offroad Nav on maastikusõidu navigeerimis- ja võistlussüsteem. Projekt aitab kasutajatel marsruute planeerida, neid live-jälgimisega läbida ning võistlustel osaleda, hoides andmed ühtsena mobiilirakenduse (Flutter) ja veebikliendi (React/Vite) vahel.
+Offroad Nav on maastikusõidu navigeerimis- ja võistlussüsteem. Projekt võimaldab kasutajatel planeerida marsruute, läbida neid reaalajas jälgimisega ning osaleda võistlustel.
 
 ### 1.2 Lahendatav probleem
 * Puudub ühtne keskkond maastikumarsruutide loomiseks ja ohutuks läbimiseks, arvestades keelatud alasid.
@@ -299,8 +299,10 @@ Täielik loend on failis `pubspec.yaml`.
 ### 5.3 Arenduskeskkonna seadistus
 1. Paigalda Flutter SDK.
 2. Paigalda Node.js ja npm (`web_app` jaoks).
-3. Lisa Google Maps API võti faili `android/app/src/main/AndroidManifest.xml` (Android).
-4. Loo `web_app` jaoks `.env` ja lisa Firebase võtmed.
+3. Google Maps API võti ei ole salvestatud koodi sees. Võti tuleb lisada `.env` faili projekti juurkaustas ning see süstitakse Androidi build’i käigus automaatselt.
+4. Loo projekti juurkausta `.env` fail ja lisa sinna vajalikud API võtmed, näiteks:```GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here```
+Ilma `.env` failita Androidi rakenduse build ebaõnnestub, kuna API võti lisatakse build’i ajal.
+5. Loo `web_app` jaoks `.env` ja lisa Firebase võtmed.
 
 ### 5.4 Projekti build (Dev + Prod)
 **Dev (Flutter):**
@@ -377,7 +379,66 @@ service cloud.firestore {
   }
 }
 ```
+Näidis Realtime Database’i reeglitest:
+```    {
+  "rules": {
+    ".read": false,
+    ".write": false,
+      
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },  
+  	
+    "groups_members": {
+      "$groupId": {
+        // чтобы участники могли проверить членство (не обязательно, но удобно)
+        ".read": "auth != null && data.child(auth.uid).val() === true",
+        // менять состав группы лучше делать с сервера/через Firestore,
+        // поэтому здесь по умолчанию закрываем
+        ".write": false
+      }
+    },  
+      
+    "groups_live": {
+      "$groupId": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+      
+    "competition_meta": {
+      "$compId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (
+          !data.exists() || data.child('adminId').val() == auth.uid
+        )"
+      }
+    },
 
+    "competitions_participants": {
+      "$compId": {
+        ".read": "auth != null && data.child(auth.uid).val() === true",
+        ".write": false
+      }
+    },
+
+    "competition_live": {
+      "$compId": {
+        ".read": "auth != null && root.child('competition_meta/' + $compId + '/adminId').val() == auth.uid",
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      }
+    }
+      
+  }
+}
+```
 ### 5.7 Soovitused CI/CD jaoks
 * Kasuta GitHub Actionsit Flutteri buildiks (`flutter build apk`) ja staatiliste kontrollide käivitamiseks.
 * Veebiklienti saab juurutada Firebase Hostingusse, backend-funktsioonid Firebase Functionsi kaudu.
